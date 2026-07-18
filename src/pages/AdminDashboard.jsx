@@ -1,7 +1,11 @@
+import Layout from '../components/Layout'
+import AjustesInstitucion from './admin/AjustesInstitucion'
+
 export default function AdminDashboard() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <h1 className="text-2xl font-bold text-slate-800">Panel Admin (provisional)</h1>
-    </div>
+    <Layout>
+      <h1 className="text-2xl font-bold text-slate-800 mb-6">Panel de administración</h1>
+      <AjustesInstitucion />
+    </Layout>
   )
 }

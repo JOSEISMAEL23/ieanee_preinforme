@@ -11,6 +11,7 @@ import EstudiantesAdmin from './pages/admin/EstudiantesAdmin'
 import DocenteDashboard from './pages/DocenteDashboard'
 import DocentesAdmin from './pages/admin/DocentesAdmin'
 import PeriodosAdmin from './pages/admin/PeriodosAdmin'
+import ConsolidadoAdmin from './pages/admin/ConsolidadoAdmin'
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
               <Route path="estudiantes" element={<EstudiantesAdmin />} />
               <Route path="docentes" element={<DocentesAdmin />} />
               <Route path="periodos" element={<PeriodosAdmin />} />
+              <Route path="consolidado" element={<ConsolidadoAdmin />} />
             </Route>
             <Route
               path="/docente"

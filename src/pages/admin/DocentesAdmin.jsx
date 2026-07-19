@@ -53,6 +53,9 @@ export default function DocentesAdmin() {
   const [grupos, setGrupos] = useState([]) // {id, letra, grado_id}
   const [docentes, setDocentes] = useState(null)
   const [expandido, setExpandido] = useState(null)
+  const [editandoId, setEditandoId] = useState(null)
+  const [nombreEditado, setNombreEditado] = useState('')
+  const [guardandoNombre, setGuardandoNombre] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [mensaje, setMensaje] = useState('')
   const [procesando, setProcesando] = useState(false)
@@ -123,6 +126,45 @@ export default function DocentesAdmin() {
       return
     }
     setMensaje(`Contraseña de ${d.nombre} actualizada.`)
+  }
+
+  const iniciarEdicionNombre = (d) => {
+    setEditandoId(d.id)
+    setNombreEditado(d.nombre)
+  }
+
+  const cancelarEdicionNombre = () => {
+    setEditandoId(null)
+    setNombreEditado('')
+  }
+
+  const guardarNombreEditado = async (d) => {
+    const nuevo = nombreEditado.trim()
+    if (!nuevo) return
+    setGuardandoNombre(true)
+    const { error } = await supabase.from('docentes').update({ nombre: nuevo }).eq('id', d.id)
+    setGuardandoNombre(false)
+    if (error) {
+      setMensaje('Error al actualizar el nombre: ' + error.message)
+      return
+    }
+    setMensaje(`Nombre actualizado a "${nuevo}". Se refleja en todas sus asignaciones automáticamente.`)
+    setEditandoId(null)
+    cargarDocentes()
+  }
+
+  const cambiarCorreo = async (d) => {
+    const nuevo = prompt(`Nuevo correo para ${d.nombre}:`, d.email)
+    if (!nuevo || !nuevo.trim() || nuevo.trim() === d.email) return
+    const { data, error } = await supabase.functions.invoke('admin-docentes', {
+      body: { accion: 'cambiar_email', docente_id: d.id, user_id: d.user_id, nuevo_email: nuevo.trim() },
+    })
+    if (error || data?.error) {
+      setMensaje('Error al cambiar el correo: ' + (data?.error || error.message))
+      return
+    }
+    setMensaje(`Correo de ${d.nombre} actualizado a ${nuevo.trim()}.`)
+    cargarDocentes()
   }
 
   const quitarAsignacion = async (asignacionId, docenteId) => {
@@ -267,6 +309,30 @@ export default function DocentesAdmin() {
                 </button>
                 {expandido === d.id && (
                   <div className="p-4 flex flex-col gap-2">
+                    {editandoId === d.id ? (
+                      <div className="flex items-center gap-2 mb-2 pb-3 border-b border-slate-100">
+                        <input
+                          value={nombreEditado}
+                          onChange={e => setNombreEditado(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && guardarNombreEditado(d)}
+                          className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => guardarNombreEditado(d)}
+                          disabled={guardandoNombre || !nombreEditado.trim()}
+                          className="bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                        >
+                          {guardandoNombre ? 'Guardando...' : 'Guardar'}
+                        </button>
+                        <button
+                          onClick={cancelarEdicionNombre}
+                          className="bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : null}
                     {d.asignaciones.map(a => (
                       <div key={a.id} className="flex items-center justify-between text-sm text-slate-700">
                         <span>{a.grupos.grados.nombre} {a.grupos.letra} — {a.materias.nombre}</span>
@@ -283,10 +349,22 @@ export default function DocentesAdmin() {
                     )}
                     <div className="flex gap-4 mt-3 pt-3 border-t border-slate-100">
                       <button
+                        onClick={() => iniciarEdicionNombre(d)}
+                        className="text-slate-600 hover:text-slate-900 text-xs font-semibold"
+                      >
+                        Editar nombre
+                      </button>
+                      <button
                         onClick={() => resetearPassword(d)}
                         className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold"
                       >
                         Restablecer contraseña
+                      </button>
+                      <button
+                        onClick={() => cambiarCorreo(d)}
+                        className="text-emerald-700 hover:text-emerald-900 text-xs font-semibold"
+                      >
+                        Cambiar correo
                       </button>
                       <button
                         onClick={() => eliminarDocente(d)}

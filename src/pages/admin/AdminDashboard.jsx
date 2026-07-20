@@ -8,6 +8,7 @@ const secciones = [
   { to: '/admin/estudiantes', label: 'Estudiantes' },
   { to: '/admin/docentes', label: 'Docentes' },
   { to: '/admin/consolidado', label: 'Consolidado' },
+  { to: '/asistencia/informe', label: 'Asistencia' },
 ]
 
 export default function AdminDashboard() {

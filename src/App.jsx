@@ -14,6 +14,8 @@ import DocentesAdmin from './pages/admin/DocentesAdmin'
 import ConsolidadoAdmin from './pages/admin/ConsolidadoAdmin'
 import BoletinesImprimir from './pages/admin/BoletinesImprimir'
 import DocenteDashboard from './pages/DocenteDashboard'
+import AsistenciaDashboard from './pages/AsistenciaDashboard'
+import AsistenciaInforme from './pages/AsistenciaInforme'
 
 function App() {
   return (
@@ -63,6 +65,22 @@ function App() {
               element={
                 <ProtectedRoute rolRequerido="docente">
                   <DocenteDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/asistencia"
+              element={
+                <ProtectedRoute>
+                  <AsistenciaDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/asistencia/informe"
+              element={
+                <ProtectedRoute>
+                  <AsistenciaInforme />
                 </ProtectedRoute>
               }
             />

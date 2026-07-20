@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { useNavigate } from 'react-router-dom'
 
 export default function DocenteDashboard() {
   const { docente } = useAuth()
@@ -12,6 +13,7 @@ export default function DocenteDashboard() {
   const [marcados, setMarcados] = useState({})
   const [guardandoId, setGuardandoId] = useState(null)
   const [mensaje, setMensaje] = useState('')
+  const navigate = useNavigate()
 
   useEffect(() => {
     (async () => {
@@ -57,10 +59,10 @@ export default function DocenteDashboard() {
 
       setEstudiantes(estData || [])
       const m = {}
-      ;(estData || []).forEach(e => {
-        const fila = marcasData.find(x => x.estudiante_id === e.id)
-        m[e.id] = fila?.dificultad ?? false
-      })
+        ; (estData || []).forEach(e => {
+          const fila = marcasData.find(x => x.estudiante_id === e.id)
+          m[e.id] = fila?.dificultad ?? false
+        })
       setMarcados(m)
     })()
   }, [asign?.grupo_id, asign?.materia_id, periodo?.id])
@@ -147,6 +149,13 @@ export default function DocenteDashboard() {
           )}
           <h1 className="text-xl font-bold text-slate-800 mb-5">Hola, {docente.nombre}</h1>
 
+          <button
+            onClick={() => navigate('/asistencia')}
+            className="inline-flex items-center gap-2 bg-white border border-emerald-700 text-emerald-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition mb-5"
+          >
+            📋 Llamado a lista
+          </button>
+
           {asignaciones.length > 1 && (
             <div className="mb-5">
               <label className="text-sm font-semibold text-slate-700 mb-1 block">Grupo y materia</label>
@@ -168,9 +177,8 @@ export default function DocenteDashboard() {
             <div className="text-lg font-bold text-slate-800">
               {asign.grupos.grados.nombre} {asign.grupos.letra} · {asign.materias.nombre}
             </div>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${
-              marcadosCount > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-            }`}>
+            <span className={`text-xs font-bold px-3 py-1 rounded-full ${marcadosCount > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+              }`}>
               {marcadosCount} con dificultad
             </span>
           </div>
@@ -205,17 +213,15 @@ export default function DocenteDashboard() {
                   key={e.id}
                   onClick={() => puedeMarcar && toggle(e.id)}
                   disabled={guardandoId === e.id || !puedeMarcar}
-                  className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-left transition ${
-                    marcados[e.id] ? 'bg-red-50' : 'bg-slate-50'
-                  } ${!puedeMarcar ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-left transition ${marcados[e.id] ? 'bg-red-50' : 'bg-slate-50'
+                    } ${!puedeMarcar ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   <span className="text-sm text-slate-800">{e.nombre}</span>
                   <span
-                    className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-extrabold border-2 ${
-                      marcados[e.id]
+                    className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-extrabold border-2 ${marcados[e.id]
                         ? 'bg-red-600 border-red-600 text-white'
                         : 'bg-white border-slate-300 text-transparent'
-                    }`}
+                      }`}
                   >
                     X
                   </span>

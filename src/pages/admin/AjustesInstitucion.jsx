@@ -5,12 +5,16 @@ import { useConfiguracion } from '../../context/ConfiguracionContext'
 export default function AjustesInstitucion() {
   const { config, recargar } = useConfiguracion()
   const [nombre, setNombre] = useState('')
+  const [eslogan, setEslogan] = useState('')
   const [subiendo, setSubiendo] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState('')
 
   useEffect(() => {
-    if (config) setNombre(config.nombre_institucion)
+    if (config) {
+      setNombre(config.nombre_institucion)
+      setEslogan(config.eslogan || '')
+    }
   }, [config])
 
   const guardarNombre = async () => {
@@ -18,11 +22,11 @@ export default function AjustesInstitucion() {
     setMensaje('')
     const { error } = await supabase
       .from('configuracion')
-      .update({ nombre_institucion: nombre, updated_at: new Date().toISOString() })
+      .update({ nombre_institucion: nombre, eslogan, updated_at: new Date().toISOString() })
       .eq('id', 1)
     setGuardando(false)
     if (error) { setMensaje('Error al guardar: ' + error.message); return }
-    setMensaje('Nombre actualizado correctamente.')
+    setMensaje('Datos actualizados correctamente.')
     recargar()
   }
 
@@ -66,10 +70,20 @@ export default function AjustesInstitucion() {
       <label className="text-sm font-semibold text-slate-700 mb-1 block">
         Nombre de la institución
       </label>
+      <input
+        value={nombre}
+        onChange={e => setNombre(e.target.value)}
+        className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full mb-4"
+      />
+
+      <label className="text-sm font-semibold text-slate-700 mb-1 block">
+        Eslogan (aparece en la pantalla de inicio de sesión)
+      </label>
       <div className="flex gap-2 mb-6">
         <input
-          value={nombre}
-          onChange={e => setNombre(e.target.value)}
+          value={eslogan}
+          onChange={e => setEslogan(e.target.value)}
+          placeholder='Ej: "Unidad Fe y Superación"'
           className="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1"
         />
         <button

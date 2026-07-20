@@ -126,6 +126,11 @@ export default function DocenteDashboard() {
 
   const marcadosCount = Object.values(marcados).filter(Boolean).length
 
+  const ahora = new Date()
+  const aunNoInicia = periodo.fecha_inicio && ahora < new Date(periodo.fecha_inicio)
+  const plazoCerrado = periodo.fecha_limite && ahora > new Date(periodo.fecha_limite)
+  const puedeMarcar = !aunNoInicia && !plazoCerrado
+
   return (
     <Layout>
       <div className="max-w-2xl mx-auto">
@@ -133,6 +138,13 @@ export default function DocenteDashboard() {
           <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
             {periodo.nombre}
           </p>
+          {(periodo.fecha_inicio || periodo.fecha_limite) && (
+            <p className="text-xs text-slate-500 mb-1">
+              {periodo.fecha_inicio && <>Inicia: {new Date(periodo.fecha_inicio).toLocaleString('es-CO')}</>}
+              {periodo.fecha_inicio && periodo.fecha_limite && ' · '}
+              {periodo.fecha_limite && <>Cierra: <b>{new Date(periodo.fecha_limite).toLocaleString('es-CO')}</b></>}
+            </p>
+          )}
           <h1 className="text-xl font-bold text-slate-800 mb-5">Hola, {docente.nombre}</h1>
 
           {asignaciones.length > 1 && (
@@ -167,6 +179,19 @@ export default function DocenteDashboard() {
             Los cambios se guardan automáticamente.
           </p>
 
+          {aunNoInicia && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg px-4 py-3 mb-4">
+              El plazo para marcar este periodo aún no ha comenzado. Podrás hacerlo a partir del{' '}
+              {new Date(periodo.fecha_inicio).toLocaleString('es-CO')}.
+            </div>
+          )}
+          {plazoCerrado && (
+            <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-4 py-3 mb-4">
+              El plazo para marcar este periodo se cerró el {new Date(periodo.fecha_limite).toLocaleString('es-CO')}.
+              Si necesitas hacer un ajuste, contacta al administrador.
+            </div>
+          )}
+
           {estudiantes === null ? (
             <p className="text-sm text-slate-400">Cargando estudiantes...</p>
           ) : estudiantes.length === 0 ? (
@@ -178,11 +203,11 @@ export default function DocenteDashboard() {
               {estudiantes.map(e => (
                 <button
                   key={e.id}
-                  onClick={() => toggle(e.id)}
-                  disabled={guardandoId === e.id}
+                  onClick={() => puedeMarcar && toggle(e.id)}
+                  disabled={guardandoId === e.id || !puedeMarcar}
                   className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-left transition ${
                     marcados[e.id] ? 'bg-red-50' : 'bg-slate-50'
-                  }`}
+                  } ${!puedeMarcar ? 'opacity-60 cursor-not-allowed' : ''}`}
                 >
                   <span className="text-sm text-slate-800">{e.nombre}</span>
                   <span

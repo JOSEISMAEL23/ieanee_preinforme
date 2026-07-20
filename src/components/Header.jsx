@@ -6,7 +6,7 @@ export default function Header() {
   const { config } = useConfiguracion()
 
   return (
-    <header className="bg-emerald-900 text-white">
+    <header className="bg-emerald-900 text-white no-print">
       <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {config?.logo_url ? (

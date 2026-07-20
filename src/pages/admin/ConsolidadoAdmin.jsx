@@ -171,9 +171,13 @@ export default function ConsolidadoAdmin() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => window.print()}
+          <button
+            onClick={() => {
+              if (!periodoId || !gradoId) return
+              window.open(`/admin/consolidado/imprimir?periodo=${periodoId}&grado=${gradoId}&letra=${letra}`, '_blank')
+            }}
             className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold">
-            Imprimir / Guardar PDF
+            Imprimir / Guardar PDF (boletines)
           </button>
           <button onClick={exportarGrupoExcel}
             className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">
@@ -204,6 +208,7 @@ export default function ConsolidadoAdmin() {
           <VistaBoletines
             grado={grado} letra={letra} periodo={periodo} datos={datos}
             nombreInstitucion={config?.nombre_institucion}
+            logoUrl={config?.logo_url}
           />
         )}
       </div>
@@ -211,8 +216,12 @@ export default function ConsolidadoAdmin() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; }
-          @page { size: legal; margin: 10mm; }
+          body { background: white !important; margin: 0 !important; }
+          .print-area { margin: 0 !important; padding: 0 !important; }
+          .boletin-hoja { page-break-after: always; }
+          .boletin-hoja:last-child { page-break-after: auto; }
+          .boletin-card { page-break-inside: avoid; break-inside: avoid; }
+          @page { size: legal; margin: 8mm; }
         }
       `}</style>
     </div>
@@ -257,22 +266,31 @@ function VistaMatriz({ grado, letra, datos }) {
   )
 }
 
-function VistaBoletines({ grado, letra, periodo, datos, nombreInstitucion }) {
+function VistaBoletines({ grado, letra, periodo, datos, nombreInstitucion, logoUrl }) {
   const { materias, estudiantes, marcasPorEstudiante } = datos
+  const estudiantesConDificultad = estudiantes.filter(e => (marcasPorEstudiante[e.id]?.size ?? 0) > 0)
+
   const grupos5 = []
-  for (let i = 0; i < estudiantes.length; i += 5) grupos5.push(estudiantes.slice(i, i + 5))
+  for (let i = 0; i < estudiantesConDificultad.length; i += 5) grupos5.push(estudiantesConDificultad.slice(i, i + 5))
+
+  if (estudiantesConDificultad.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-6 no-print">
+        <p className="text-sm text-slate-400">
+          Ningún estudiante de este grupo tiene materias marcadas con dificultad en este periodo — no hay boletines que generar.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6">
       {grupos5.map((grupoEst, idx) => (
-        <div
-          key={idx}
-          className="bg-white rounded-xl border border-slate-200 p-6 print:border-0 print:rounded-none print:shadow-none"
-          style={{ pageBreakAfter: idx < grupos5.length - 1 ? 'always' : 'auto' }}
-        >
-          {grupoEst.map(est => (
+        <div key={idx} className="boletin-hoja bg-white rounded-xl border border-slate-200 p-4 print:border-0 print:rounded-none print:p-0">
+          {grupoEst.map((est, i) => (
             <BoletinEstudiante
               key={est.id}
+              esUltimo={i === grupoEst.length - 1}
               estudiante={est}
               grado={grado}
               letra={letra}
@@ -280,6 +298,7 @@ function VistaBoletines({ grado, letra, periodo, datos, nombreInstitucion }) {
               materias={materias}
               dificultades={marcasPorEstudiante[est.id] || new Set()}
               nombreInstitucion={nombreInstitucion}
+              logoUrl={logoUrl}
             />
           ))}
         </div>
@@ -288,7 +307,7 @@ function VistaBoletines({ grado, letra, periodo, datos, nombreInstitucion }) {
   )
 }
 
-function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificultades, nombreInstitucion }) {
+function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificultades, nombreInstitucion, logoUrl, esUltimo }) {
   const filas = []
   for (let i = 0; i < materias.length; i += COLUMNAS_GRILLA) filas.push(materias.slice(i, i + COLUMNAS_GRILLA))
   const ultimaFila = filas[filas.length - 1]
@@ -298,30 +317,42 @@ function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificu
   }
 
   return (
-    <div className="border-b border-slate-300 py-4 last:border-b-0 text-[13px]">
-      <p className="text-[10px] text-slate-400 mb-1">{nombreInstitucion}</p>
-      <p className="text-center font-bold text-sm mb-3">
-        INFORME PARCIAL {periodo?.nombre?.toUpperCase() ?? '____________'} — {grado?.nombre?.toUpperCase()}
-      </p>
-
-      <div className="flex flex-wrap gap-x-6 gap-y-1 mb-2 text-sm">
-        <span><b>NOMBRE:</b> {estudiante.nombre}</span>
-        <span><b>GRADO:</b> {grado?.nombre} {letra}</span>
-        <span><b>FECHA:</b> ______________</span>
+    <div
+      className={`boletin-card py-2.5 text-[11px] leading-tight ${!esUltimo ? 'border-b border-dashed border-slate-400' : ''}`}
+    >
+      <div className="grid items-center mb-1.5" style={{ gridTemplateColumns: '56px 1fr 56px' }}>
+        <div>
+          {logoUrl && (
+            <img src={logoUrl} alt="Logo institución" className="h-14 w-14 object-cover rounded-full" />
+          )}
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] font-semibold text-slate-700 mb-0.5">{nombreInstitucion}</p>
+          <p className="font-bold text-[12px]">
+            INFORME PARCIAL {periodo?.nombre?.toUpperCase() ?? '____________'} — {grado?.nombre?.toUpperCase()}
+          </p>
+        </div>
+        <div />
       </div>
 
-      <p className="text-xs text-slate-600 mb-2 leading-snug">
+      <div className="flex flex-wrap gap-x-5 gap-y-0.5 mb-1 text-[11px]">
+        <span><b>NOMBRE:</b> {estudiante.nombre}</span>
+        <span><b>GRADO:</b> {grado?.nombre} {letra}</span>
+        <span><b>FECHA:</b> __________</span>
+      </div>
+
+      <p className="text-[9px] text-slate-600 mb-1.5 leading-snug">
         El estudiante presenta reportes negativos en las asignaturas marcadas con X porque no ha cumplido con sus
         responsabilidades escolares obteniendo desempeños bajos en: tareas, trabajos, actividades en clase,
         evaluaciones orales y/o escritas, participación oral; reportes negativos en el comportamiento y ausencias sin justificar.
       </p>
 
-      <table className="w-full border-collapse mb-2">
+      <table className="w-full border-collapse mb-1.5" style={{ pageBreakInside: 'avoid' }}>
         <tbody>
           {filas.map((fila, i) => (
             <tr key={i}>
               {fila.map((m, j) => (
-                <td key={j} className="border border-slate-800 px-2 py-1.5 text-xs align-top" style={{ width: `${100 / COLUMNAS_GRILLA}%` }}>
+                <td key={j} className="border border-slate-800 px-1.5 py-1 text-[10px] align-top" style={{ width: `${100 / COLUMNAS_GRILLA}%` }}>
                   {m ? (
                     <div className="flex items-center justify-between gap-1">
                       <span>{m.nombre}</span>
@@ -335,7 +366,7 @@ function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificu
         </tbody>
       </table>
 
-      <p className="text-sm">DOCENTE: ______________________________</p>
+      <p className="text-[11px]">DOCENTE: ______________________________</p>
     </div>
   )
 }

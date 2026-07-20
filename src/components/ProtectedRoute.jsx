@@ -1,8 +1,9 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function ProtectedRoute({ children, rolRequerido }) {
   const { docente, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
@@ -14,6 +15,10 @@ export default function ProtectedRoute({ children, rolRequerido }) {
 
   if (!docente) {
     return <Navigate to="/" replace />
+  }
+
+  if (docente.debe_cambiar_password && location.pathname !== '/cambiar-password') {
+    return <Navigate to="/cambiar-password" replace />
   }
 
   if (rolRequerido && docente.rol !== rolRequerido) {

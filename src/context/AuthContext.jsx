@@ -44,8 +44,13 @@ export function AuthProvider({ children }) {
     setDocente(null)
   }
 
+  const recargarDocente = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    await loadDocente(session?.user?.id)
+  }
+
   return (
-    <AuthContext.Provider value={{ session, docente, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, docente, loading, signIn, signOut, recargarDocente }}>
       {children}
     </AuthContext.Provider>
   )

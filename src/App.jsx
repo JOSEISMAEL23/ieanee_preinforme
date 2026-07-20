@@ -4,14 +4,16 @@ import { ConfiguracionProvider } from './context/ConfiguracionContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import RoleRedirect from './pages/RoleRedirect'
+import CambiarPassword from './pages/CambiarPassword'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AjustesInstitucion from './pages/admin/AjustesInstitucion'
+import PeriodosAdmin from './pages/admin/PeriodosAdmin'
 import MateriasAdmin from './pages/admin/MateriasAdmin'
 import EstudiantesAdmin from './pages/admin/EstudiantesAdmin'
-import DocenteDashboard from './pages/DocenteDashboard'
 import DocentesAdmin from './pages/admin/DocentesAdmin'
-import PeriodosAdmin from './pages/admin/PeriodosAdmin'
 import ConsolidadoAdmin from './pages/admin/ConsolidadoAdmin'
+import BoletinesImprimir from './pages/admin/BoletinesImprimir'
+import DocenteDashboard from './pages/DocenteDashboard'
 
 function App() {
   return (
@@ -22,6 +24,14 @@ function App() {
             <Route path="/" element={<Login />} />
             <Route path="/redirect" element={<RoleRedirect />} />
             <Route
+              path="/cambiar-password"
+              element={
+                <ProtectedRoute>
+                  <CambiarPassword />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin"
               element={
                 <ProtectedRoute rolRequerido="admin">
@@ -30,12 +40,24 @@ function App() {
               }
             >
               <Route index element={<AjustesInstitucion />} />
+              <Route path="periodos" element={<PeriodosAdmin />} />
               <Route path="materias" element={<MateriasAdmin />} />
               <Route path="estudiantes" element={<EstudiantesAdmin />} />
               <Route path="docentes" element={<DocentesAdmin />} />
-              <Route path="periodos" element={<PeriodosAdmin />} />
               <Route path="consolidado" element={<ConsolidadoAdmin />} />
             </Route>
+
+            {/* Ruta de impresión: fuera del layout de /admin a propósito,
+                para que nunca herede el sidebar ni el header */}
+            <Route
+              path="/admin/consolidado/imprimir"
+              element={
+                <ProtectedRoute rolRequerido="admin">
+                  <BoletinesImprimir />
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/docente"
               element={

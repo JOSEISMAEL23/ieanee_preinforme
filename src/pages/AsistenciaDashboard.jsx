@@ -166,7 +166,15 @@ export default function AsistenciaDashboard() {
     <Layout>
       <div className="max-w-2xl mx-auto flex flex-col gap-5">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-slate-800">Llamado a lista</h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              ← Volver
+            </button>
+            <h1 className="text-xl font-bold text-slate-800">Llamado a lista</h1>
+          </div>
           <button
             onClick={() => navigate('/asistencia/informe')}
             className="text-sm font-semibold text-emerald-800 border border-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition"

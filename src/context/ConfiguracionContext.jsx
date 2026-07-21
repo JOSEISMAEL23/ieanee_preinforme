@@ -1,11 +1,23 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+const CACHE_KEY = 'sa_config_cache'
 const ConfiguracionContext = createContext(null)
 
+function leerCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function guardarCache(data) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)) } catch {}
+}
+
 export function ConfiguracionProvider({ children }) {
-  const [config, setConfig] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [config, setConfig] = useState(leerCache)
+  const [loading, setLoading] = useState(!leerCache())
 
   const cargar = async () => {
     const { data, error } = await supabase
@@ -13,7 +25,10 @@ export function ConfiguracionProvider({ children }) {
       .select('*')
       .eq('id', 1)
       .single()
-    if (!error) setConfig(data)
+    if (!error && data) {
+      setConfig(data)
+      guardarCache(data)
+    }
     setLoading(false)
   }
 

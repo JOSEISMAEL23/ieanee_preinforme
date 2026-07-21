@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
@@ -12,6 +13,7 @@ function formatearFecha(fechaISO) {
 export default function AsistenciaInforme() {
   const { docente } = useAuth()
   const esAdmin = docente?.rol === 'admin'
+  const navigate = useNavigate()
 
   const [periodos, setPeriodos] = useState([])
   const [periodoId, setPeriodoId] = useState(null)
@@ -148,7 +150,15 @@ export default function AsistenciaInforme() {
     <Layout>
       <div className="max-w-4xl mx-auto flex flex-col gap-5">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-xl font-bold text-slate-800">Informe de asistencia</h1>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(esAdmin ? '/admin' : '/asistencia')}
+              className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              ← Volver
+            </button>
+            <h1 className="text-xl font-bold text-slate-800">Informe de asistencia</h1>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-4">

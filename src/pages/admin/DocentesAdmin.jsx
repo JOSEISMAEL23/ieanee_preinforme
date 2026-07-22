@@ -61,6 +61,13 @@ export default function DocentesAdmin() {
   const [procesando, setProcesando] = useState(false)
   const fileRef = useRef(null)
 
+  // Estado para el mini-formulario de agregar asignación a un docente existente
+  const [agregandoAsignId, setAgregandoAsignId] = useState(null) // id del docente al que se le agrega
+  const [asignGradoId,  setAsignGradoId]  = useState(null)
+  const [asignLetras,   setAsignLetras]   = useState([])
+  const [asignMateriaId, setAsignMateriaId] = useState('')
+  const [guardandoAsign, setGuardandoAsign] = useState(false)
+
   const cargarCatalogos = async () => {
     const { data: gradosData } = await supabase.from('grados').select('*').order('orden')
     const { data: materiasData } = await supabase.from('materias').select('*').order('orden')
@@ -169,6 +176,55 @@ export default function DocentesAdmin() {
 
   const quitarAsignacion = async (asignacionId, docenteId) => {
     await supabase.from('asignaciones').delete().eq('id', asignacionId)
+    cargarDocentes()
+  }
+
+  const abrirAgregarAsignacion = (docenteId) => {
+    setAgregandoAsignId(docenteId)
+    setAsignGradoId(grados[0]?.id ?? null)
+    setAsignLetras([])
+    setAsignMateriaId('')
+  }
+
+  const toggleAsignLetra = (l) => {
+    setAsignLetras(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
+  }
+
+  const guardarNuevaAsignacion = async (docente) => {
+    if (!asignGradoId || asignLetras.length === 0 || !asignMateriaId) return
+    setGuardandoAsign(true)
+    setMensaje('')
+
+    // Construir filas a insertar (una por letra seleccionada)
+    const nuevas = asignLetras.map(l => {
+      const grupo = grupos.find(g => g.grado_id === asignGradoId && g.letra === l)
+      return grupo ? { docente_id: docente.id, grupo_id: grupo.id, materia_id: Number(asignMateriaId) } : null
+    }).filter(Boolean)
+
+    // Filtrar duplicados contra asignaciones ya existentes
+    const existentes = new Set(docente.asignaciones.map(a => `${a.grupo_id}_${a.materia_id}`))
+    const sinDuplicados = nuevas.filter(a => !existentes.has(`${a.grupo_id}_${a.materia_id}`))
+
+    if (sinDuplicados.length === 0) {
+      setMensaje('Esas asignaciones ya existen para este docente.')
+      setGuardandoAsign(false)
+      return
+    }
+
+    const { error } = await supabase.from('asignaciones').insert(sinDuplicados)
+    setGuardandoAsign(false)
+
+    if (error) {
+      setMensaje('Error al agregar asignación: ' + error.message)
+      return
+    }
+
+    const omitidos = nuevas.length - sinDuplicados.length
+    setMensaje(
+      `${sinDuplicados.length} asignación(es) agregada(s) a ${docente.nombre}.` +
+      (omitidos > 0 ? ` (${omitidos} ya existía${omitidos > 1 ? 'n' : ''})` : '')
+    )
+    setAgregandoAsignId(null)
     cargarDocentes()
   }
 
@@ -347,6 +403,74 @@ export default function DocentesAdmin() {
                     {d.asignaciones.length === 0 && (
                       <p className="text-sm text-slate-400">Sin asignaciones.</p>
                     )}
+
+                    {/* ── Mini-formulario agregar asignación ── */}
+                    {agregandoAsignId === d.id ? (
+                      <div className="mt-2 pt-3 border-t border-slate-100 bg-emerald-50 rounded-lg p-3 flex flex-col gap-2">
+                        <p className="text-xs font-bold text-emerald-800 uppercase tracking-wide">Agregar asignación</p>
+                        <div className="grid gap-2" style={{ gridTemplateColumns: '130px 1fr 1fr' }}>
+                          {/* Grado */}
+                          <select
+                            value={asignGradoId ?? ''}
+                            onChange={e => { setAsignGradoId(Number(e.target.value)); setAsignMateriaId('') }}
+                            className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                          >
+                            {grados.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+                          </select>
+                          {/* Letras */}
+                          <div className="flex gap-1 items-center">
+                            {LETRAS.map(l => (
+                              <button
+                                key={l} type="button"
+                                onClick={() => toggleAsignLetra(l)}
+                                className={`w-9 h-9 rounded-lg text-sm font-bold border transition ${
+                                  asignLetras.includes(l)
+                                    ? 'bg-emerald-800 text-white border-emerald-800'
+                                    : 'bg-white text-slate-600 border-slate-300'
+                                }`}
+                              >{l}</button>
+                            ))}
+                          </div>
+                          {/* Materia */}
+                          <select
+                            value={asignMateriaId}
+                            onChange={e => setAsignMateriaId(e.target.value)}
+                            className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                          >
+                            <option value="">Materia...</option>
+                            {(materiasByGrado[asignGradoId] || []).map(m => (
+                              <option key={m.id} value={m.id}>{m.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {(materiasByGrado[asignGradoId] || []).length === 0 && (
+                          <p className="text-xs text-slate-400">Este grado no tiene materias configuradas.</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => guardarNuevaAsignacion(d)}
+                            disabled={guardandoAsign || asignLetras.length === 0 || !asignMateriaId}
+                            className="bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
+                          >
+                            {guardandoAsign ? 'Guardando...' : 'Guardar'}
+                          </button>
+                          <button
+                            onClick={() => setAgregandoAsignId(null)}
+                            className="bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => abrirAgregarAsignacion(d.id)}
+                        className="self-start text-xs text-emerald-700 hover:text-emerald-900 font-semibold mt-1"
+                      >
+                        + Agregar asignación
+                      </button>
+                    )}
+
                     <div className="flex gap-4 mt-3 pt-3 border-t border-slate-100">
                       <button
                         onClick={() => iniciarEdicionNombre(d)}

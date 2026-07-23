@@ -4,6 +4,53 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 
+const iconProps = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 2,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+}
+
+function IconClipboardCheck({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="m9 14 2 2 4-4" />
+    </svg>
+  )
+}
+
+function IconSearch({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  )
+}
+
+function IconAlertTriangle({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  )
+}
+
+function IconX({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
 export default function DocenteDashboard() {
   const { docente } = useAuth()
   const [periodo, setPeriodo] = useState(null)
@@ -13,6 +60,7 @@ export default function DocenteDashboard() {
   const [marcados, setMarcados] = useState({})
   const [guardandoId, setGuardandoId] = useState(null)
   const [mensaje, setMensaje] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -39,6 +87,7 @@ export default function DocenteDashboard() {
     if (!asign || !periodo) return
     (async () => {
       setEstudiantes(null)
+      setBusqueda('')
       const { data: estData } = await supabase
         .from('estudiantes')
         .select('*')
@@ -126,7 +175,13 @@ export default function DocenteDashboard() {
     )
   }
 
+  const totalEstudiantes = estudiantes?.length ?? 0
   const marcadosCount = Object.values(marcados).filter(Boolean).length
+  const sinDificultadCount = Math.max(totalEstudiantes - marcadosCount, 0)
+
+  const estudiantesFiltrados = (estudiantes || []).filter(e =>
+    e.nombre.toLowerCase().includes(busqueda.trim().toLowerCase())
+  )
 
   const ahora = new Date()
   const aunNoInicia = periodo.fecha_inicio && ahora < new Date(periodo.fecha_inicio)
@@ -135,34 +190,53 @@ export default function DocenteDashboard() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
-            {periodo.nombre}
-          </p>
-          {(periodo.fecha_inicio || periodo.fecha_limite) && (
-            <p className="text-xs text-slate-500 mb-1">
-              {periodo.fecha_inicio && <>Inicia: {new Date(periodo.fecha_inicio).toLocaleString('es-CO')}</>}
-              {periodo.fecha_inicio && periodo.fecha_limite && ' · '}
-              {periodo.fecha_limite && <>Cierra: <b>{new Date(periodo.fecha_limite).toLocaleString('es-CO')}</b></>}
-            </p>
-          )}
-          <h1 className="text-xl font-bold text-slate-800 mb-5">Hola, {docente.nombre}</h1>
+      <div className="max-w-2xl mx-auto flex flex-col gap-4">
+        {/* Cabecera: periodo activo + saludo + acceso al módulo de asistencia */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
+                {periodo.nombre}
+              </p>
+              {(periodo.fecha_inicio || periodo.fecha_limite) && (
+                <p className="text-xs text-slate-500 mb-1">
+                  {periodo.fecha_inicio && <>Inicia: {new Date(periodo.fecha_inicio).toLocaleString('es-CO')}</>}
+                  {periodo.fecha_inicio && periodo.fecha_limite && ' · '}
+                  {periodo.fecha_limite && <>Cierra: <b>{new Date(periodo.fecha_limite).toLocaleString('es-CO')}</b></>}
+                </p>
+              )}
+              <h1 className="text-xl font-bold text-slate-800">Hola, {docente.nombre}</h1>
+            </div>
 
-          <button
-            onClick={() => navigate('/asistencia')}
-            className="inline-flex items-center gap-2 bg-white border border-emerald-700 text-emerald-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-50 transition mb-5"
-          >
-            📋 Llamado a lista
-          </button>
+            <button
+              onClick={() => navigate('/asistencia')}
+              className="flex items-center gap-3 min-h-[44px] bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 hover:bg-emerald-100 transition self-start"
+            >
+              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-600 text-white shrink-0">
+                <IconClipboardCheck className="w-5 h-5" />
+              </span>
+              <span className="text-left">
+                <span className="block text-sm font-bold text-emerald-800">Llamado a lista</span>
+                <span className="block text-xs text-emerald-600">Módulo de asistencia →</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Área principal: marcación de dificultades académicas (preinformes) */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <IconAlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+            <h2 className="text-base font-bold text-slate-800">Marcación de Dificultades Académicas</h2>
+          </div>
 
           {asignaciones.length > 1 && (
-            <div className="mb-5">
+            <div className="mb-4">
               <label className="text-sm font-semibold text-slate-700 mb-1 block">Grupo y materia</label>
               <select
                 value={selIdx}
                 onChange={e => setSelIdx(Number(e.target.value))}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
+                className="border border-slate-300 rounded-lg px-3 py-2.5 text-sm w-full min-h-[44px]"
               >
                 {asignaciones.map((a, i) => (
                   <option key={a.id} value={i}>
@@ -173,15 +247,26 @@ export default function DocenteDashboard() {
             </div>
           )}
 
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-lg font-bold text-slate-800">
-              {asign.grupos.grados.nombre} {asign.grupos.letra} · {asign.materias.nombre}
-            </div>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${marcadosCount > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-              }`}>
-              {marcadosCount} con dificultad
-            </span>
+          <div className="text-lg font-bold text-slate-800 mb-4">
+            {asign.grupos.grados.nombre} {asign.grupos.letra} · {asign.materias.nombre}
           </div>
+
+          {/* Resumen compacto con insignias */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-2.5 text-center">
+              <div className="text-lg font-bold text-slate-800">{totalEstudiantes}</div>
+              <div className="text-[11px] text-slate-500 font-medium leading-tight">Total<br />estudiantes</div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-2 py-2.5 text-center">
+              <div className="text-lg font-bold text-red-700">{marcadosCount}</div>
+              <div className="text-[11px] text-red-600 font-medium leading-tight">Con<br />dificultad</div>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-2.5 text-center">
+              <div className="text-lg font-bold text-emerald-700">{sinDificultadCount}</div>
+              <div className="text-[11px] text-emerald-600 font-medium leading-tight">Sin<br />dificultad</div>
+            </div>
+          </div>
+
           <p className="text-sm text-slate-500 mb-4">
             Marca únicamente a los estudiantes con dificultad académica en esta materia durante este periodo.
             Los cambios se guardan automáticamente.
@@ -207,27 +292,53 @@ export default function DocenteDashboard() {
               Este grupo no tiene estudiantes cargados todavía. Pídele al administrador que los importe.
             </p>
           ) : (
-            <div className="flex flex-col gap-1">
-              {estudiantes.map(e => (
-                <button
-                  key={e.id}
-                  onClick={() => puedeMarcar && toggle(e.id)}
-                  disabled={guardandoId === e.id || !puedeMarcar}
-                  className={`flex items-center justify-between w-full px-4 py-3 rounded-lg text-left transition ${marcados[e.id] ? 'bg-red-50' : 'bg-slate-50'
-                    } ${!puedeMarcar ? 'opacity-60 cursor-not-allowed' : ''}`}
-                >
-                  <span className="text-sm text-slate-800">{e.nombre}</span>
-                  <span
-                    className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-extrabold border-2 ${marcados[e.id]
-                        ? 'bg-red-600 border-red-600 text-white'
-                        : 'bg-white border-slate-300 text-transparent'
-                      }`}
-                  >
-                    X
-                  </span>
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="relative mb-3">
+                <IconSearch className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  placeholder="Buscar estudiante por nombre..."
+                  className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2.5 text-sm min-h-[44px]"
+                />
+              </div>
+
+              {estudiantesFiltrados.length === 0 ? (
+                <p className="text-sm text-slate-400 px-1 py-3">
+                  No se encontraron estudiantes que coincidan con "{busqueda}".
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {estudiantesFiltrados.map(e => (
+                    <button
+                      key={e.id}
+                      onClick={() => puedeMarcar && toggle(e.id)}
+                      disabled={guardandoId === e.id || !puedeMarcar}
+                      className={`flex items-center justify-between gap-3 w-full min-h-[56px] px-4 py-3 rounded-xl border text-left transition ${marcados[e.id]
+                          ? 'bg-red-50 border-red-200'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                        } ${!puedeMarcar ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{e.nombre}</p>
+                        <p className={`text-xs font-semibold ${marcados[e.id] ? 'text-red-600' : 'text-slate-400'}`}>
+                          {marcados[e.id] ? 'Con dificultad' : 'Sin dificultad'}
+                        </p>
+                      </div>
+                      <span
+                        className={`flex items-center justify-center w-11 h-11 rounded-lg border-2 shrink-0 transition ${marcados[e.id]
+                            ? 'bg-red-600 border-red-600 text-white'
+                            : 'bg-white border-slate-300 text-slate-300'
+                          }`}
+                      >
+                        <IconX className="w-5 h-5" />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {mensaje && <p className="text-sm text-red-600 mt-3">{mensaje}</p>}

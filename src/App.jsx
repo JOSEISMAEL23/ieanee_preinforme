@@ -18,6 +18,7 @@ import BoletinesImprimir from './pages/admin/BoletinesImprimir'
 import DocenteDashboard from './pages/DocenteDashboard'
 import AsistenciaDashboard from './pages/AsistenciaDashboard'
 import AsistenciaInforme from './pages/AsistenciaInforme'
+import CalificacionesConfig from './pages/CalificacionesConfig'
 
 function App() {
   return (
@@ -85,6 +86,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AsistenciaInforme />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calificaciones/config"
+              element={
+                <ProtectedRoute>
+                  <CalificacionesConfig />
                 </ProtectedRoute>
               }
             />

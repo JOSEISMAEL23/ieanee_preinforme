@@ -51,6 +51,22 @@ function IconX({ className }) {
   )
 }
 
+function IconSliders({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  )
+}
+
 export default function DocenteDashboard() {
   const { docente } = useAuth()
   const [periodo, setPeriodo] = useState(null)
@@ -208,18 +224,33 @@ export default function DocenteDashboard() {
               <h1 className="text-xl font-bold text-slate-800">Hola, {docente.nombre}</h1>
             </div>
 
-            <button
-              onClick={() => navigate('/asistencia')}
-              className="flex items-center gap-3 min-h-[44px] bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 hover:bg-emerald-100 transition self-start"
-            >
-              <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-600 text-white shrink-0">
-                <IconClipboardCheck className="w-5 h-5" />
-              </span>
-              <span className="text-left">
-                <span className="block text-sm font-bold text-emerald-800">Llamado a lista</span>
-                <span className="block text-xs text-emerald-600">Módulo de asistencia →</span>
-              </span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 self-start">
+              <button
+                onClick={() => navigate('/asistencia')}
+                className="flex items-center gap-3 min-h-[44px] bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 hover:bg-emerald-100 transition"
+              >
+                <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-600 text-white shrink-0">
+                  <IconClipboardCheck className="w-5 h-5" />
+                </span>
+                <span className="text-left">
+                  <span className="block text-sm font-bold text-emerald-800">Llamado a lista</span>
+                  <span className="block text-xs text-emerald-600">Módulo de asistencia →</span>
+                </span>
+              </button>
+
+              <button
+                onClick={() => navigate('/calificaciones/config')}
+                className="flex items-center gap-3 min-h-[44px] bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5 hover:bg-violet-100 transition"
+              >
+                <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-violet-600 text-white shrink-0">
+                  <IconSliders className="w-5 h-5" />
+                </span>
+                <span className="text-left">
+                  <span className="block text-sm font-bold text-violet-800">Subparámetros</span>
+                  <span className="block text-xs text-violet-600">Configurar mi materia →</span>
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 

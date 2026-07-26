@@ -255,14 +255,22 @@ export default function CalificacionesCaptura() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto flex flex-col gap-5">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/docente')}
+              className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              ← Volver
+            </button>
+            <h1 className="text-xl font-bold text-slate-800">Captura de notas</h1>
+          </div>
           <button
-            onClick={() => navigate('/docente')}
-            className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+            onClick={() => navigate('/calificaciones/informe')}
+            className="text-sm font-semibold text-sky-800 border border-sky-700 px-3 py-1.5 rounded-lg hover:bg-sky-50 transition"
           >
-            ← Volver
+            Ver informe →
           </button>
-          <h1 className="text-xl font-bold text-slate-800">Captura de notas</h1>
         </div>
 
         {!ventanaOk && periodoObj && (

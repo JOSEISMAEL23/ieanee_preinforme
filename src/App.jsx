@@ -20,6 +20,7 @@ import AsistenciaDashboard from './pages/AsistenciaDashboard'
 import AsistenciaInforme from './pages/AsistenciaInforme'
 import CalificacionesConfig from './pages/CalificacionesConfig'
 import CalificacionesCaptura from './pages/CalificacionesCaptura'
+import CalificacionesInforme from './pages/CalificacionesInforme'
 
 function App() {
   return (
@@ -103,6 +104,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CalificacionesCaptura />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calificaciones/informe"
+              element={
+                <ProtectedRoute>
+                  <CalificacionesInforme />
                 </ProtectedRoute>
               }
             />

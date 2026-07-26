@@ -8,7 +8,8 @@ const secciones = [
   { to: '/admin/estudiantes', label: 'Estudiantes' },
   { to: '/admin/docentes', label: 'Docentes' },
   { to: '/admin/incapacidades', label: 'Incapacidades' },
-  { to: '/admin/parametros', label: 'Calificaciones' },
+  { to: '/admin/parametros', label: 'Config. calificaciones' },
+  { to: '/calificaciones/informe', label: 'Informe calificaciones' },
   { to: '/admin/consolidado', label: 'Consolidado' },
   { to: '/asistencia/informe', label: 'Asistencia' },
 ]

@@ -19,6 +19,7 @@ import DocenteDashboard from './pages/DocenteDashboard'
 import AsistenciaDashboard from './pages/AsistenciaDashboard'
 import AsistenciaInforme from './pages/AsistenciaInforme'
 import CalificacionesConfig from './pages/CalificacionesConfig'
+import CalificacionesCaptura from './pages/CalificacionesCaptura'
 
 function App() {
   return (
@@ -94,6 +95,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CalificacionesConfig />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calificaciones"
+              element={
+                <ProtectedRoute>
+                  <CalificacionesCaptura />
                 </ProtectedRoute>
               }
             />

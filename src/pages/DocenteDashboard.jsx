@@ -67,6 +67,15 @@ function IconSliders({ className }) {
   )
 }
 
+function IconPencil({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  )
+}
+
 export default function DocenteDashboard() {
   const { docente } = useAuth()
   const [periodo, setPeriodo] = useState(null)
@@ -248,6 +257,19 @@ export default function DocenteDashboard() {
                 <span className="text-left">
                   <span className="block text-sm font-bold text-violet-800">Subparámetros</span>
                   <span className="block text-xs text-violet-600">Configurar mi materia →</span>
+                </span>
+              </button>
+
+              <button
+                onClick={() => navigate('/calificaciones')}
+                className="flex items-center gap-3 min-h-[44px] bg-sky-50 border border-sky-200 rounded-xl px-4 py-2.5 hover:bg-sky-100 transition"
+              >
+                <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-sky-600 text-white shrink-0">
+                  <IconPencil className="w-5 h-5" />
+                </span>
+                <span className="text-left">
+                  <span className="block text-sm font-bold text-sky-800">Notas</span>
+                  <span className="block text-xs text-sky-600">Capturar calificaciones →</span>
                 </span>
               </button>
             </div>

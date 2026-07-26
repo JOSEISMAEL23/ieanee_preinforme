@@ -55,7 +55,10 @@ export default function AsistenciaDashboard() {
   const [fecha,       setFecha]       = useState(hoy())
   const [estudiantes, setEstudiantes] = useState(null)
   const [registros,   setRegistros]   = useState({})
+  // { [estudiante_id]: incapacidad } — solo las que cubren la `fecha` seleccionada
+  const [incapacidades, setIncapacidades] = useState({})
   const [guardandoId, setGuardandoId] = useState(null)
+  const [marcandoTodos, setMarcandoTodos] = useState(false)
   const [mensaje,     setMensaje]     = useState('')
   const [cargando,    setCargando]    = useState(true)
 
@@ -97,6 +100,7 @@ export default function AsistenciaDashboard() {
   const cargarEstudiantesYRegistros = async () => {
     setEstudiantes(null)
     setRegistros({})
+    setIncapacidades({})
 
     const { data: estData } = await supabase
       .from('estudiantes')
@@ -106,21 +110,42 @@ export default function AsistenciaDashboard() {
 
     const ids = (estData || []).map(e => e.id)
     let asistData = []
+    let incapData = []
     if (ids.length > 0) {
-      const { data } = await supabase
-        .from('asistencias')
-        .select('estudiante_id, estado')
-        .eq('periodo_id', periodoId)
-        .eq('asignacion_id', asign.id)
-        .eq('fecha', fecha)
-        .in('estudiante_id', ids)
-      asistData = data || []
+      const [asistRes, incapRes] = await Promise.all([
+        supabase
+          .from('asistencias')
+          .select('estudiante_id, estado')
+          .eq('periodo_id', periodoId)
+          .eq('asignacion_id', asign.id)
+          .eq('fecha', fecha)
+          .in('estudiante_id', ids),
+        // Incapacidades que cubren la fecha seleccionada: inicio <= fecha <= fin
+        supabase
+          .from('incapacidades')
+          .select('estudiante_id, fecha_inicio, fecha_fin, motivo')
+          .in('estudiante_id', ids)
+          .lte('fecha_inicio', fecha)
+          .gte('fecha_fin', fecha),
+      ])
+      asistData = asistRes.data || []
+      incapData = incapRes.data || []
     }
 
     const mapa = {}
     asistData.forEach(r => { mapa[r.estudiante_id] = r.estado })
+
+    const mapaIncap = {}
+    incapData.forEach(i => { mapaIncap[i.estudiante_id] = i })
+
     setEstudiantes(estData || [])
     setRegistros(mapa)
+    setIncapacidades(mapaIncap)
+  }
+
+  const textoIncapacidad = (inc) => {
+    const rango = `Incapacitado del ${formatearFecha(inc.fecha_inicio)} al ${formatearFecha(inc.fecha_fin)}`
+    return inc.motivo ? `${rango} · ${inc.motivo}` : rango
   }
 
   const marcarEstado = async (estId, nuevoEstado) => {
@@ -129,6 +154,9 @@ export default function AsistenciaDashboard() {
       setMensaje(mensajeVentanaCerrada(periodoObj))
       return
     }
+
+    // Un día incapacitado no admite asiste/falta/excusa (prioridad: incapacidad > estado)
+    if (incapacidades[estId]) return
 
     const estadoAnterior = registros[estId]
     const estadoFinal    = estadoAnterior === nuevoEstado ? null : nuevoEstado
@@ -177,13 +205,71 @@ export default function AsistenciaDashboard() {
     setGuardandoId(null)
   }
 
+  /**
+   * Estudiantes que hoy no tienen ningún estado registrado y sí admiten marcación.
+   * Los incapacitados en `fecha` quedan fuera: su fila está en solo lectura.
+   */
+  const sinMarcar = () =>
+    (estudiantes || []).filter(e => !registros[e.id] && !incapacidades[e.id])
+
+  const marcarTodosAsisten = async () => {
+    if (!asistenciaAbierta(periodoObj)) {
+      setMensaje(mensajeVentanaCerrada(periodoObj))
+      return
+    }
+
+    const pendientes = sinMarcar()
+    if (pendientes.length === 0) return
+
+    const confirmado = window.confirm(
+      `¿Marcar como "asiste" a los ${pendientes.length} estudiantes sin marcar? ` +
+      `Las faltas y excusas ya registradas no se modifican.`
+    )
+    if (!confirmado) return
+
+    const registrosPrevios = registros
+
+    setRegistros(prev => {
+      const next = { ...prev }
+      pendientes.forEach(e => { next[e.id] = 'asiste' })
+      return next
+    })
+
+    setMarcandoTodos(true)
+    setMensaje('')
+
+    const ahora = new Date().toISOString()
+    const filas = pendientes.map(e => ({
+      periodo_id:     periodoId,
+      asignacion_id:  asign.id,
+      estudiante_id:  e.id,
+      fecha,
+      estado:         'asiste',
+      registrado_por: docente.id,
+      updated_at:     ahora,
+    }))
+
+    const { error } = await supabase
+      .from('asistencias')
+      .upsert(filas, { onConflict: 'periodo_id,asignacion_id,estudiante_id,fecha' })
+
+    if (error) {
+      setRegistros(registrosPrevios)
+      setMensaje('Error al marcar todos: ' + error.message)
+    }
+    setMarcandoTodos(false)
+  }
+
   const resumen = () => {
     const vals = Object.values(registros)
+    const incapacitados = (estudiantes || []).filter(e => incapacidades[e.id]).length
     return {
       asiste:      vals.filter(v => v === 'asiste').length,
       falta:       vals.filter(v => v === 'falta').length,
       excusa:      vals.filter(v => v === 'excusa').length,
-      sinRegistro: (estudiantes?.length ?? 0) - vals.length,
+      incapacitados,
+      // Los incapacitados no cuentan como "sin marcar": no se les puede registrar estado.
+      sinRegistro: sinMarcar().length,
     }
   }
 
@@ -200,8 +286,9 @@ export default function AsistenciaDashboard() {
     )
   }
 
-  const r        = resumen()
-  const ventanaOk = asistenciaAbierta(periodoObj)
+  const r          = resumen()
+  const ventanaOk  = asistenciaAbierta(periodoObj)
+  const pendientes = sinMarcar()
 
   return (
     <Layout>
@@ -282,6 +369,9 @@ export default function AsistenciaDashboard() {
                 <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-full">{r.asiste} asisten</span>
                 <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">{r.falta} faltan</span>
                 <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full">{r.excusa} excusas</span>
+                {r.incapacitados > 0 && (
+                  <span className="bg-sky-100 text-sky-800 px-2 py-1 rounded-full">{r.incapacitados} incapacitados</span>
+                )}
                 {r.sinRegistro > 0 && (
                   <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{r.sinRegistro} sin marcar</span>
                 )}
@@ -291,6 +381,24 @@ export default function AsistenciaDashboard() {
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          {estudiantes !== null && estudiantes.length > 0 && (
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200">
+              <span className="text-xs text-slate-500">
+                {pendientes.length > 0
+                  ? `${pendientes.length} sin marcar`
+                  : 'Todos los estudiantes tienen estado'}
+              </span>
+              <button
+                onClick={marcarTodosAsisten}
+                disabled={!ventanaOk || marcandoTodos || pendientes.length === 0}
+                title={!ventanaOk ? mensajeVentanaCerrada(periodoObj) : undefined}
+                className="shrink-0 min-h-[38px] bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {marcandoTodos ? 'Marcando...' : '✓ Marcar todos asisten'}
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600 uppercase tracking-wide">
             <div className="col-span-1 px-4 py-2">Estudiante</div>
             <div className="col-span-2 px-4 py-2 text-center">Estado</div>
@@ -306,13 +414,27 @@ export default function AsistenciaDashboard() {
             <div className="divide-y divide-slate-100">
               {estudiantes.map(e => {
                 const estadoActual = registros[e.id] ?? null
-                const bgFila = estadoActual === 'falta'  ? 'bg-red-50'
+                const incap        = incapacidades[e.id] ?? null
+                const bgFila = incap                     ? 'bg-sky-50'
+                             : estadoActual === 'falta'  ? 'bg-red-50'
                              : estadoActual === 'excusa' ? 'bg-amber-50'
                              : estadoActual === 'asiste' ? 'bg-emerald-50'
                              : ''
                 return (
                   <div key={e.id} className={`flex items-center justify-between px-4 py-3 gap-3 ${bgFila}`}>
-                    <span className="text-sm text-slate-800 flex-1 min-w-0 truncate">{e.nombre}</span>
+                    {/* El badge va DEBAJO del nombre: en celular, ponerlo al lado
+                        desalineaba los botones cuando el nombre es largo. */}
+                    <div className="flex-1 min-w-0">
+                      <span className="block text-sm text-slate-800 truncate">{e.nombre}</span>
+                      {incap && (
+                        <span
+                          title={textoIncapacidad(incap)}
+                          className="mt-1 inline-flex items-center gap-1 bg-sky-100 text-sky-800 border border-sky-300 text-xs font-semibold px-2 py-0.5 rounded-full"
+                        >
+                          🩹 Incapacitado
+                        </span>
+                      )}
+                    </div>
                     <div className="flex gap-1.5 shrink-0">
                       {ESTADOS.map(est => {
                         const isActivo = estadoActual === est.key
@@ -320,8 +442,12 @@ export default function AsistenciaDashboard() {
                           <button
                             key={est.key}
                             onClick={() => marcarEstado(e.id, est.key)}
-                            disabled={guardandoId === e.id || !ventanaOk}
-                            title={!ventanaOk ? mensajeVentanaCerrada(periodoObj) : undefined}
+                            disabled={guardandoId === e.id || marcandoTodos || !ventanaOk || Boolean(incap)}
+                            title={
+                              incap      ? textoIncapacidad(incap)
+                              : !ventanaOk ? mensajeVentanaCerrada(periodoObj)
+                              : undefined
+                            }
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
                               isActivo
                                 ? est.activo

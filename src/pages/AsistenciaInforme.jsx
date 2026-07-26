@@ -10,6 +10,42 @@ function formatearFecha(fechaISO) {
   return `${d}/${m}/${y}`
 }
 
+// timestamptz → 'YYYY-MM-DD' en hora local, para poder comparar con las
+// columnas `date` de incapacidades (que no llevan zona horaria).
+function aFechaLocal(ts) {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Días calendario del rango, ambos extremos incluidos.
+function diasRango(inicio, fin) {
+  return Math.round((new Date(fin) - new Date(inicio)) / 86400000) + 1
+}
+
+// Une rangos solapados para no contar dos veces el mismo día cuando un
+// estudiante tiene varias incapacidades que se pisan.
+function fusionarRangos(rangos) {
+  const ordenados = [...rangos].sort((a, b) => (a.inicio < b.inicio ? -1 : 1))
+  const salida = []
+  ordenados.forEach(r => {
+    const ultimo = salida[salida.length - 1]
+    if (ultimo && r.inicio <= ultimo.fin) {
+      if (r.fin > ultimo.fin) ultimo.fin = r.fin
+    } else {
+      salida.push({ ...r })
+    }
+  })
+  return salida
+}
+
+function cubiertaPorIncapacidad(fecha, rangos) {
+  return rangos.some(r => fecha >= r.inicio && fecha <= r.fin)
+}
+
+function formatearRango(r) {
+  return `${formatearFecha(r.inicio)} — ${formatearFecha(r.fin)}`
+}
+
 export default function AsistenciaInforme() {
   const { docente } = useAuth()
   const esAdmin = docente?.rol === 'admin'
@@ -88,36 +124,71 @@ export default function AsistenciaInforme() {
     const { data: estudiantes } = await supabase
       .from('estudiantes').select('id, nombre').eq('grupo_id', grupoId).order('nombre')
 
+    // Ventana de asistencia del periodo: acota qué incapacidades "caen" en él.
+    // Si el admin no definió fechas, no hay recorte y se cuentan completas.
+    const periodo = periodos.find(p => p.id === periodoId)
+    const desde = periodo?.asistencia_fecha_inicio ? aFechaLocal(periodo.asistencia_fecha_inicio) : null
+    const hasta = periodo?.asistencia_fecha_limite ? aFechaLocal(periodo.asistencia_fecha_limite) : null
+
     const ids = (estudiantes || []).map(e => e.id)
     let registros = []
+    let incaps = []
     if (ids.length > 0) {
-      const { data } = await supabase
-        .from('asistencias')
-        .select('estudiante_id, fecha, estado')
-        .eq('periodo_id', periodoId)
-        .eq('asignacion_id', asignId)
+      let queryIncap = supabase
+        .from('incapacidades')
+        .select('estudiante_id, fecha_inicio, fecha_fin')
         .in('estudiante_id', ids)
-        .in('estado', ['falta', 'excusa'])
-        .order('fecha')
-      registros = data || []
+      if (hasta) queryIncap = queryIncap.lte('fecha_inicio', hasta)
+      if (desde) queryIncap = queryIncap.gte('fecha_fin', desde)
+
+      const [asistRes, incapRes] = await Promise.all([
+        supabase
+          .from('asistencias')
+          .select('estudiante_id, fecha, estado')
+          .eq('periodo_id', periodoId)
+          .eq('asignacion_id', asignId)
+          .in('estudiante_id', ids)
+          .in('estado', ['falta', 'excusa'])
+          .order('fecha'),
+        queryIncap,
+      ])
+      registros = asistRes.data || []
+      incaps = incapRes.data || []
     }
 
     const mapaFaltas = {}
     const mapaExcusas = {}
-    ;(estudiantes || []).forEach(e => { mapaFaltas[e.id] = []; mapaExcusas[e.id] = [] })
+    const mapaIncap = {}
+    ;(estudiantes || []).forEach(e => {
+      mapaFaltas[e.id] = []; mapaExcusas[e.id] = []; mapaIncap[e.id] = []
+    })
     registros.forEach(r => {
       if (r.estado === 'falta') mapaFaltas[r.estudiante_id]?.push(r.fecha)
       if (r.estado === 'excusa') mapaExcusas[r.estudiante_id]?.push(r.fecha)
     })
+    incaps.forEach(i => {
+      // Recortar el rango a la ventana del periodo antes de contar días
+      const inicio = desde && i.fecha_inicio < desde ? desde : i.fecha_inicio
+      const fin    = hasta && i.fecha_fin    > hasta ? hasta : i.fecha_fin
+      if (fin < inicio) return
+      mapaIncap[i.estudiante_id]?.push({ inicio, fin })
+    })
+    Object.keys(mapaIncap).forEach(k => { mapaIncap[k] = fusionarRangos(mapaIncap[k]) })
 
     const resultado = (estudiantes || [])
-      .map(e => ({
-        id: e.id,
-        nombre: e.nombre,
-        faltas: mapaFaltas[e.id] || [],
-        excusas: mapaExcusas[e.id] || [],
-      }))
-      .filter(e => e.faltas.length > 0 || e.excusas.length > 0)
+      .map(e => {
+        const rangos = mapaIncap[e.id] || []
+        return {
+          id: e.id,
+          nombre: e.nombre,
+          // Regla central: un día cubierto por incapacidad NO cuenta como falla.
+          faltas:  (mapaFaltas[e.id]  || []).filter(f => !cubiertaPorIncapacidad(f, rangos)),
+          excusas: (mapaExcusas[e.id] || []).filter(f => !cubiertaPorIncapacidad(f, rangos)),
+          incapacidades: rangos,
+          diasIncapacidad: rangos.reduce((n, r) => n + diasRango(r.inicio, r.fin), 0),
+        }
+      })
+      .filter(e => e.faltas.length > 0 || e.excusas.length > 0 || e.incapacidades.length > 0)
       .sort((a, b) => b.faltas.length - a.faltas.length)
 
     setInforme({ estudiantes: resultado, asign, total: estudiantes?.length ?? 0 })
@@ -126,16 +197,24 @@ export default function AsistenciaInforme() {
 
   const exportarExcel = () => {
     if (!informe) return
-    const header = ['Estudiante', 'Total Fallas', 'Fechas de Fallas', 'Total Excusas', 'Fechas de Excusas']
+    const header = [
+      'Estudiante', 'Total Fallas', 'Fechas de Fallas', 'Total Excusas', 'Fechas de Excusas',
+      'Total Días Incapacidad', 'Rangos de Incapacidad',
+    ]
     const filas = informe.estudiantes.map(e => [
       e.nombre,
       e.faltas.length,
       e.faltas.map(formatearFecha).join(', '),
       e.excusas.length,
       e.excusas.map(formatearFecha).join(', '),
+      e.diasIncapacidad,
+      e.incapacidades.map(formatearRango).join(', '),
     ])
     const ws = XLSX.utils.aoa_to_sheet([header, ...filas])
-    ws['!cols'] = [{ wch: 35 }, { wch: 12 }, { wch: 50 }, { wch: 14 }, { wch: 50 }]
+    ws['!cols'] = [
+      { wch: 35 }, { wch: 12 }, { wch: 50 }, { wch: 14 }, { wch: 50 },
+      { wch: 20 }, { wch: 50 },
+    ]
     const wb = XLSX.utils.book_new()
     const periodo = periodos.find(p => p.id === periodoId)
     const a = informe.asign
@@ -226,7 +305,7 @@ export default function AsistenciaInforme() {
                   )}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
-                  {informe.estudiantes.length} de {informe.total} estudiantes con fallas o excusas
+                  {informe.estudiantes.length} de {informe.total} estudiantes con fallas, excusas o incapacidades
                 </div>
               </div>
               <button onClick={exportarExcel}
@@ -237,7 +316,7 @@ export default function AsistenciaInforme() {
 
             {informe.estudiantes.length === 0 ? (
               <div className="px-5 py-10 text-center text-slate-400 text-sm">
-                Ningún estudiante tiene fallas o excusas registradas en este periodo para esta materia.
+                Ningún estudiante tiene fallas, excusas o incapacidades registradas en este periodo para esta materia.
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
@@ -252,6 +331,11 @@ export default function AsistenciaInforme() {
                         {e.excusas.length > 0 && (
                           <span className="bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">
                             {e.excusas.length} excusa{e.excusas.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {e.diasIncapacidad > 0 && (
+                          <span className="bg-sky-100 text-sky-800 text-xs font-bold px-3 py-1 rounded-full">
+                            🩹 {e.diasIncapacidad} día{e.diasIncapacidad !== 1 ? 's' : ''} incapacidad
                           </span>
                         )}
                       </div>
@@ -270,6 +354,15 @@ export default function AsistenciaInforme() {
                         {e.excusas.map(f => (
                           <span key={f} className="bg-amber-50 border border-amber-200 text-amber-700 text-xs px-2 py-0.5 rounded-md">
                             {formatearFecha(f)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {e.incapacidades.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {e.incapacidades.map(r => (
+                          <span key={`${r.inicio}-${r.fin}`} className="bg-sky-50 border border-sky-200 text-sky-800 text-xs px-2 py-0.5 rounded-md">
+                            🩹 {formatearRango(r)}
                           </span>
                         ))}
                       </div>

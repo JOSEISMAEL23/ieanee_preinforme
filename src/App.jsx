@@ -12,6 +12,7 @@ import MateriasAdmin from './pages/admin/MateriasAdmin'
 import EstudiantesAdmin from './pages/admin/EstudiantesAdmin'
 import DocentesAdmin from './pages/admin/DocentesAdmin'
 import IncapacidadesAdmin from './pages/admin/IncapacidadesAdmin'
+import ParametrosAdmin from './pages/admin/ParametrosAdmin'
 import ConsolidadoAdmin from './pages/admin/ConsolidadoAdmin'
 import BoletinesImprimir from './pages/admin/BoletinesImprimir'
 import DocenteDashboard from './pages/DocenteDashboard'
@@ -48,6 +49,7 @@ function App() {
               <Route path="estudiantes" element={<EstudiantesAdmin />} />
               <Route path="docentes" element={<DocentesAdmin />} />
               <Route path="incapacidades" element={<IncapacidadesAdmin />} />
+              <Route path="parametros" element={<ParametrosAdmin />} />
               <Route path="consolidado" element={<ConsolidadoAdmin />} />
             </Route>
 

@@ -54,12 +54,16 @@ export default function PeriodosAdmin() {
   const [cDifLimite,  setCDifLimite]  = useState('')
   const [cAsisInicio, setCAsisInicio] = useState('')
   const [cAsisLimite, setCAsisLimite] = useState('')
+  const [cCalInicio,  setCCalInicio]  = useState('')
+  const [cCalLimite,  setCCalLimite]  = useState('')
 
   // Fechas del formulario de edición
   const [eDifInicio,  setEDifInicio]  = useState('')
   const [eDifLimite,  setEDifLimite]  = useState('')
   const [eAsisInicio, setEAsisInicio] = useState('')
   const [eAsisLimite, setEAsisLimite] = useState('')
+  const [eCalInicio,  setECalInicio]  = useState('')
+  const [eCalLimite,  setECalLimite]  = useState('')
 
   const cargar = async () => {
     const { data } = await supabase
@@ -102,6 +106,8 @@ export default function PeriodosAdmin() {
       fecha_limite:              cDifLimite  ? new Date(cDifLimite).toISOString()  : null,
       asistencia_fecha_inicio:   cAsisInicio ? new Date(cAsisInicio).toISOString() : null,
       asistencia_fecha_limite:   cAsisLimite ? new Date(cAsisLimite).toISOString() : null,
+      calificacion_fecha_inicio: cCalInicio  ? new Date(cCalInicio).toISOString()  : null,
+      calificacion_fecha_limite: cCalLimite  ? new Date(cCalLimite).toISOString()  : null,
     })
     setGuardando(false)
 
@@ -109,6 +115,7 @@ export default function PeriodosAdmin() {
     setNombre('')
     setCDifInicio(''); setCDifLimite('')
     setCAsisInicio(''); setCAsisLimite('')
+    setCCalInicio(''); setCCalLimite('')
     setMensaje(`Periodo "${nombreLimpio}" creado y activado.`)
     cargar()
   }
@@ -119,6 +126,8 @@ export default function PeriodosAdmin() {
     setEDifLimite(aInputLocal(p.fecha_limite))
     setEAsisInicio(aInputLocal(p.asistencia_fecha_inicio))
     setEAsisLimite(aInputLocal(p.asistencia_fecha_limite))
+    setECalInicio(aInputLocal(p.calificacion_fecha_inicio))
+    setECalLimite(aInputLocal(p.calificacion_fecha_limite))
   }
 
   const guardarFechas = async (p) => {
@@ -129,6 +138,8 @@ export default function PeriodosAdmin() {
         fecha_limite:            eDifLimite  ? new Date(eDifLimite).toISOString()  : null,
         asistencia_fecha_inicio: eAsisInicio ? new Date(eAsisInicio).toISOString() : null,
         asistencia_fecha_limite: eAsisLimite ? new Date(eAsisLimite).toISOString() : null,
+        calificacion_fecha_inicio: eCalInicio ? new Date(eCalInicio).toISOString() : null,
+        calificacion_fecha_limite: eCalLimite ? new Date(eCalLimite).toISOString() : null,
       })
       .eq('id', p.id)
     if (error) { setMensaje('Error al guardar fechas: ' + error.message); return }
@@ -143,8 +154,8 @@ export default function PeriodosAdmin() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-lg font-bold text-slate-800 mb-1">Periodos académicos</h2>
         <p className="text-sm text-slate-500 mb-5">
-          Solo un periodo puede estar activo a la vez. Las ventanas de <b>dificultades</b> y <b>asistencia</b> son independientes:
-          cada módulo respeta sus propias fechas de apertura y cierre.
+          Solo un periodo puede estar activo a la vez. Las ventanas de <b>dificultades</b>, <b>asistencia</b> y
+          <b> calificaciones</b> son independientes: cada módulo respeta sus propias fechas de apertura y cierre.
         </p>
 
         {/* ── Formulario de creación ── */}
@@ -197,6 +208,27 @@ export default function PeriodosAdmin() {
               </div>
             </div>
           </div>
+
+          {/* Calificaciones */}
+          <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 flex flex-col gap-2">
+            <p className="text-xs font-bold text-violet-700 uppercase tracking-wide">
+              🎓 Ventana — Calificaciones
+            </p>
+            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Inicio (opcional)</label>
+                <input type="datetime-local" value={cCalInicio}
+                  onChange={e => setCCalInicio(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 block mb-1">Plazo límite (opcional)</label>
+                <input type="datetime-local" value={cCalLimite}
+                  onChange={e => setCCalLimite(e.target.value)}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <button
@@ -236,14 +268,19 @@ export default function PeriodosAdmin() {
                 {/* Resumen de los dos módulos */}
                 <div className="mt-2 flex flex-col gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 w-28 shrink-0">📋 Dificultades</span>
+                    <span className="text-xs text-slate-500 w-32 shrink-0">📋 Dificultades</span>
                     <BadgeEstado activo={p.activo} fechaInicio={p.fecha_inicio} fechaLimite={p.fecha_limite} />
                     <ResumenFechas inicio={p.fecha_inicio} limite={p.fecha_limite} />
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 w-28 shrink-0">🗓 Asistencia</span>
+                    <span className="text-xs text-slate-500 w-32 shrink-0">🗓 Asistencia</span>
                     <BadgeEstado activo={p.activo} fechaInicio={p.asistencia_fecha_inicio} fechaLimite={p.asistencia_fecha_limite} />
                     <ResumenFechas inicio={p.asistencia_fecha_inicio} limite={p.asistencia_fecha_limite} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 w-32 shrink-0">🎓 Calificaciones</span>
+                    <BadgeEstado activo={p.activo} fechaInicio={p.calificacion_fecha_inicio} fechaLimite={p.calificacion_fecha_limite} />
+                    <ResumenFechas inicio={p.calificacion_fecha_inicio} limite={p.calificacion_fecha_limite} />
                   </div>
                 </div>
 
@@ -286,6 +323,26 @@ export default function PeriodosAdmin() {
                           <label className="text-xs text-slate-500 block mb-1">Plazo límite</label>
                           <input type="datetime-local" value={eAsisLimite}
                             onChange={e => setEAsisLimite(e.target.value)}
+                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 flex flex-col gap-2">
+                      <p className="text-xs font-bold text-violet-700 uppercase tracking-wide">
+                        🎓 Ventana — Calificaciones
+                      </p>
+                      <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                        <div>
+                          <label className="text-xs text-slate-500 block mb-1">Inicio</label>
+                          <input type="datetime-local" value={eCalInicio}
+                            onChange={e => setECalInicio(e.target.value)}
+                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-500 block mb-1">Plazo límite</label>
+                          <input type="datetime-local" value={eCalLimite}
+                            onChange={e => setECalLimite(e.target.value)}
                             className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
                         </div>
                       </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { useNavigate } from 'react-router-dom'
 
 const iconProps = {
   viewBox: '0 0 24 24',
@@ -42,6 +43,7 @@ function IconX({ className }) {
 
 export default function DificultadesDashboard() {
   const { docente } = useAuth()
+  const navigate = useNavigate()
   const [periodo, setPeriodo] = useState(null)
   const [asignaciones, setAsignaciones] = useState(null)
   const [selIdx, setSelIdx] = useState(0)
@@ -179,6 +181,15 @@ export default function DificultadesDashboard() {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto flex flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/docente')}
+            className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+          >
+            ← Volver
+          </button>
+        </div>
+
         <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
           <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
             {periodo.nombre}

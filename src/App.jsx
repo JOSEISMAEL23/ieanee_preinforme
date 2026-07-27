@@ -16,6 +16,7 @@ import ParametrosAdmin from './pages/admin/ParametrosAdmin'
 import ConsolidadoAdmin from './pages/admin/ConsolidadoAdmin'
 import BoletinesImprimir from './pages/admin/BoletinesImprimir'
 import DocenteDashboard from './pages/DocenteDashboard'
+import DificultadesDashboard from './pages/DificultadesDashboard'
 import AsistenciaDashboard from './pages/AsistenciaDashboard'
 import AsistenciaInforme from './pages/AsistenciaInforme'
 import CalificacionesConfig from './pages/CalificacionesConfig'
@@ -72,6 +73,14 @@ function App() {
               element={
                 <ProtectedRoute rolRequerido="docente">
                   <DocenteDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dificultades"
+              element={
+                <ProtectedRoute>
+                  <DificultadesDashboard />
                 </ProtectedRoute>
               }
             />

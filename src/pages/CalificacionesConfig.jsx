@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -37,6 +37,7 @@ function BadgeSuma({ total }) {
 export default function CalificacionesConfig() {
   const { docente } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [asignaciones, setAsignaciones] = useState(null)
   const [selIdx, setSelIdx] = useState(0)
@@ -60,8 +61,15 @@ export default function CalificacionesConfig() {
           .eq('docente_id', docente.id),
         supabase.from('parametros').select('*').order('orden'),
       ])
-      setAsignaciones(asignRes.data || [])
+      const listaAsign = asignRes.data || []
+      setAsignaciones(listaAsign)
       setParametros(paramRes.data || [])
+
+      const asignacionId = location.state?.asignacionId
+      if (asignacionId) {
+        const idx = listaAsign.findIndex(a => a.id === asignacionId)
+        if (idx >= 0) setSelIdx(idx)
+      }
     })()
   }, [docente.id])
 

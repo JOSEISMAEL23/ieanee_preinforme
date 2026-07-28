@@ -318,9 +318,18 @@ export default function CalificacionesCaptura() {
           {subparametros === null ? (
             <p className="text-sm text-slate-400">Cargando subparámetros...</p>
           ) : subparametros.length === 0 ? (
-            <p className="text-sm text-amber-700">
-              Esta asignación no tiene subparámetros configurados todavía. Ve a "Subparámetros" para crearlos.
-            </p>
+            <div className="bg-amber-50 border border-amber-300 rounded-xl p-6 text-center">
+              <h2 className="text-sm font-bold text-amber-900 mb-1">Sin subparámetros configurados</h2>
+              <p className="text-sm text-amber-800 mb-4">
+                Esta materia aún no tiene subparámetros configurados. Configúralos para empezar a calificar.
+              </p>
+              <button
+                onClick={() => navigate('/calificaciones/config', { state: { asignacionId: asign.id } })}
+                className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+              >
+                Configurar subparámetros
+              </button>
+            </div>
           ) : (
             <>
               <div>

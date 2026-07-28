@@ -103,7 +103,7 @@ function App() {
             <Route
               path="/calificaciones/config"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute moduloRequerido="calificaciones">
                   <CalificacionesConfig />
                 </ProtectedRoute>
               }
@@ -111,7 +111,7 @@ function App() {
             <Route
               path="/calificaciones"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute moduloRequerido="calificaciones">
                   <CalificacionesCaptura />
                 </ProtectedRoute>
               }

@@ -55,6 +55,7 @@ export default function DocentesAdmin() {
   const [expandido, setExpandido] = useState(null)
   const [editandoId, setEditandoId] = useState(null)
   const [nombreEditado, setNombreEditado] = useState('')
+  const [cargoEditado, setCargoEditado] = useState('')
   const [guardandoNombre, setGuardandoNombre] = useState(false)
   const [cargando, setCargando] = useState(true)
   const [mensaje, setMensaje] = useState('')
@@ -89,7 +90,7 @@ export default function DocentesAdmin() {
     const { data } = await supabase
       .from('docentes')
       .select(`
-        id, user_id, nombre, email, rol,
+        id, user_id, nombre, email, rol, cargo,
         asignaciones ( id, materia_id, grupo_id,
           materias ( nombre ),
           grupos ( letra, grados ( nombre ) )
@@ -138,21 +139,27 @@ export default function DocentesAdmin() {
   const iniciarEdicionNombre = (d) => {
     setEditandoId(d.id)
     setNombreEditado(d.nombre)
+    setCargoEditado(d.cargo || '')
   }
 
   const cancelarEdicionNombre = () => {
     setEditandoId(null)
     setNombreEditado('')
+    setCargoEditado('')
   }
 
   const guardarNombreEditado = async (d) => {
     const nuevo = nombreEditado.trim()
     if (!nuevo) return
+    const nuevoCargo = cargoEditado.trim()
     setGuardandoNombre(true)
-    const { error } = await supabase.from('docentes').update({ nombre: nuevo }).eq('id', d.id)
+    const { error } = await supabase
+      .from('docentes')
+      .update({ nombre: nuevo, cargo: nuevoCargo || null })
+      .eq('id', d.id)
     setGuardandoNombre(false)
     if (error) {
-      setMensaje('Error al actualizar el nombre: ' + error.message)
+      setMensaje('Error al actualizar: ' + error.message)
       return
     }
     setMensaje(`Nombre actualizado a "${nuevo}". Se refleja en todas sus asignaciones automáticamente.`)
@@ -356,7 +363,12 @@ export default function DocentesAdmin() {
                   className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 text-left"
                 >
                   <div>
-                    <div className="text-sm font-semibold text-slate-800">{d.nombre}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-800">{d.nombre}</span>
+                      {d.cargo && (
+                        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{d.cargo}</span>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-500">{d.email}</div>
                   </div>
                   <span className="text-xs bg-slate-200 text-slate-600 px-2 py-1 rounded-full font-semibold">
@@ -371,8 +383,16 @@ export default function DocentesAdmin() {
                           value={nombreEditado}
                           onChange={e => setNombreEditado(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && guardarNombreEditado(d)}
+                          placeholder="Nombre"
                           className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1"
                           autoFocus
+                        />
+                        <input
+                          value={cargoEditado}
+                          onChange={e => setCargoEditado(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && guardarNombreEditado(d)}
+                          placeholder="Cargo (opcional): Secretaria, Coordinador..."
+                          className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm flex-1"
                         />
                         <button
                           onClick={() => guardarNombreEditado(d)}
@@ -476,7 +496,7 @@ export default function DocentesAdmin() {
                         onClick={() => iniciarEdicionNombre(d)}
                         className="text-slate-600 hover:text-slate-900 text-xs font-semibold"
                       >
-                        Editar nombre
+                        Editar nombre y cargo
                       </button>
                       <button
                         onClick={() => resetearPassword(d)}

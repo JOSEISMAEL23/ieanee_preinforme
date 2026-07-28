@@ -7,7 +7,7 @@ const secciones = [
   { to: '/admin/materias', label: 'Materias por grado' },
   { to: '/admin/estudiantes', label: 'Estudiantes' },
   { to: '/admin/docentes', label: 'Docentes' },
-  { to: '/admin/modulos', label: 'Módulos por docente' },
+  { to: '/admin/modulos', label: 'Accesos y permisos' },
   { to: '/admin/incapacidades', label: 'Incapacidades' },
   { to: '/admin/parametros', label: 'Config. calificaciones' },
   { to: '/calificaciones/informe', label: 'Informe calificaciones' },

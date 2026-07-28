@@ -24,6 +24,19 @@ import CalificacionesConfig from './pages/CalificacionesConfig'
 import CalificacionesCaptura from './pages/CalificacionesCaptura'
 import CalificacionesInforme from './pages/CalificacionesInforme'
 
+// Catálogo de permisos delegables (spec permisos-delegados §3). Cualquiera
+// de estos habilita la entrada al layout de /admin; cada ruta hija exige
+// además el suyo puntual. Otorgar/quitar módulos y permisos, y crear
+// docentes, quedan fuera de este catálogo a propósito: eso no se delega.
+const PERMISOS_ADMIN = [
+  'gestionar_incapacidades',
+  'ver_informes_dificultades',
+  'ver_informes_notas',
+  'configurar_institucion',
+  'gestionar_periodos',
+  'configurar_calificaciones',
+]
+
 function App() {
   return (
     <AuthProvider>
@@ -43,20 +56,61 @@ function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute rolRequerido="admin">
+                <ProtectedRoute permisoRequerido={PERMISOS_ADMIN}>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<AjustesInstitucion />} />
-              <Route path="periodos" element={<PeriodosAdmin />} />
-              <Route path="materias" element={<MateriasAdmin />} />
-              <Route path="estudiantes" element={<EstudiantesAdmin />} />
-              <Route path="docentes" element={<DocentesAdmin />} />
-              <Route path="modulos" element={<ModulosDocenteAdmin />} />
-              <Route path="incapacidades" element={<IncapacidadesAdmin />} />
-              <Route path="parametros" element={<ParametrosAdmin />} />
-              <Route path="consolidado" element={<ConsolidadoAdmin />} />
+              {/* El layout de arriba solo exige "admin o algún permiso" para
+                  entrar; cada ruta hija exige el permiso puntual que le
+                  corresponde. Materias/Estudiantes/Docentes/Módulos no están
+                  en el catálogo de permisos a propósito — crear usuarios y
+                  otorgar accesos queda exclusivo del admin. */}
+              <Route index element={
+                <ProtectedRoute permisoRequerido="configurar_institucion">
+                  <AjustesInstitucion />
+                </ProtectedRoute>
+              } />
+              <Route path="periodos" element={
+                <ProtectedRoute permisoRequerido="gestionar_periodos">
+                  <PeriodosAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="materias" element={
+                <ProtectedRoute rolRequerido="admin">
+                  <MateriasAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="estudiantes" element={
+                <ProtectedRoute rolRequerido="admin">
+                  <EstudiantesAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="docentes" element={
+                <ProtectedRoute rolRequerido="admin">
+                  <DocentesAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="modulos" element={
+                <ProtectedRoute rolRequerido="admin">
+                  <ModulosDocenteAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="incapacidades" element={
+                <ProtectedRoute permisoRequerido="gestionar_incapacidades">
+                  <IncapacidadesAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="parametros" element={
+                <ProtectedRoute permisoRequerido="configurar_calificaciones">
+                  <ParametrosAdmin />
+                </ProtectedRoute>
+              } />
+              <Route path="consolidado" element={
+                <ProtectedRoute permisoRequerido="ver_informes_dificultades">
+                  <ConsolidadoAdmin />
+                </ProtectedRoute>
+              } />
             </Route>
 
             {/* Ruta de impresión: fuera del layout de /admin a propósito,
@@ -64,7 +118,7 @@ function App() {
             <Route
               path="/admin/consolidado/imprimir"
               element={
-                <ProtectedRoute rolRequerido="admin">
+                <ProtectedRoute permisoRequerido="ver_informes_dificultades">
                   <BoletinesImprimir />
                 </ProtectedRoute>
               }

@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 
 const iconProps = {
@@ -70,6 +72,7 @@ const MODULOS = [
     titulo: 'Subparámetros',
     descripcion: 'Configurar mi materia',
     color: 'violet',
+    controlado: 'calificaciones',
   },
   {
     ruta: '/calificaciones',
@@ -77,6 +80,7 @@ const MODULOS = [
     titulo: 'Notas',
     descripcion: 'Capturar calificaciones',
     color: 'sky',
+    controlado: 'calificaciones',
   },
   {
     ruta: '/dificultades',
@@ -117,6 +121,31 @@ const COLORES = {
 export default function DocenteDashboard() {
   const { docente } = useAuth()
   const navigate = useNavigate()
+  const [modulosActivos, setModulosActivos] = useState(null) // null = cargando
+
+  useEffect(() => {
+    if (docente.rol === 'admin') {
+      setModulosActivos(new Set(MODULOS.map(m => m.controlado).filter(Boolean)))
+      return
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('docente_modulos')
+        .select('modulo, activo')
+        .eq('docente_id', docente.id)
+      setModulosActivos(new Set((data || []).filter(m => m.activo).map(m => m.modulo)))
+    })()
+  }, [docente.id, docente.rol])
+
+  if (modulosActivos === null) {
+    return (
+      <Layout>
+        <p className="text-slate-500 text-sm">Cargando...</p>
+      </Layout>
+    )
+  }
+
+  const modulosVisibles = MODULOS.filter(m => !m.controlado || modulosActivos.has(m.controlado))
 
   return (
     <Layout>
@@ -124,7 +153,7 @@ export default function DocenteDashboard() {
         <h1 className="text-xl font-bold text-slate-800">Hola, {docente.nombre}</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {MODULOS.map(({ ruta, icono: Icono, titulo, descripcion, color }) => {
+          {modulosVisibles.map(({ ruta, icono: Icono, titulo, descripcion, color }) => {
             const c = COLORES[color]
             return (
               <button

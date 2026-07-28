@@ -1,30 +1,28 @@
 -- ============================================================================
--- Fix — ver_informes_notas también necesita leer TODAS las asignaciones y
--- subparametros, no solo notas/marcas
+-- Fix — ver_informes_notas también necesita leer TODAS las asignaciones,
+-- subparametros y docentes, no solo notas/marcas
 -- Proyecto: Seguimiento Académico (IE Andrés Escobar)
 -- Fecha: 2026-07-28
 --
 -- CÓMO USAR: Supabase Dashboard → SQL Editor → pegar todo → Run.
--- Es idempotente: se puede volver a ejecutar sin romper nada.
+-- Es idempotente: se puede volver a ejecutar sin romper nada (incluye las
+-- dos políticas de una primera pasada de este mismo fix, ya aplicadas).
 --
 -- CONTEXTO DEL BUG: la Capa 1 de permisos delegados (sql/2026-07-28_permisos_
 -- delegados.sql) amplió SOLO las políticas de SELECT de `notas` y `marcas`
 -- para el permiso ver_informes_notas / ver_informes_dificultades. Pero
 -- CalificacionesInforme.jsx, para armar el consolidado de un docente que NO
--- es el que está mirando, primero necesita:
+-- es el que está mirando, también necesita:
 --   1. Listar TODAS las asignaciones de un grupo (no solo las propias) para
 --      poblar el combo de "Materia" — consulta `asignaciones` filtrada por
 --      grupo_id, sin filtro de docente.
 --   2. Leer los `subparametros` de esa asignación ajena para poder calcular
 --      la nota.
--- Ninguna de las dos tablas se tocó en la Capa 1, así que un delegado con
--- ver_informes_notas seguía viendo, vía RLS, únicamente SU PROPIA fila de
--- `asignaciones` (la política de esa tabla nunca se amplió) y sus propios
--- `subparametros` (esa política exige tiene_modulo('calificaciones'), que
--- no tiene nada que ver con el permiso de informes). Resultado: el picker
--- de Grado/Grupo aparecía (eso sí depende de tiene_permiso, ya corregido
--- en el frontend), pero el combo de Materia y el informe generado quedaban
--- acotados a su propia asignación, sin importar qué grupo eligiera.
+--   3. Leer el `nombre` del `docentes` dueño de cada asignación ajena, vía
+--      el join asignaciones(..., docentes(nombre)) que arma el combo de
+--      Materia — si esa fila de docentes no es legible, el join vuelve
+--      null y en pantalla aparece "undefined" en vez del nombre.
+-- Ninguna de las tres tablas se tocó en la Capa 1.
 --
 -- TIPOS: docentes.id = uuid (confirmado en migraciones previas).
 -- ============================================================================
@@ -61,9 +59,25 @@ create policy "leer subparametros" on public.subparametros
   );
 
 -- ----------------------------------------------------------------------------
+-- docentes: SOLO lectura ampliada. El combo de Materia hace
+-- asignaciones(..., docentes(nombre)) para mostrar de quién es cada
+-- asignatura — si la fila de `docentes` del dueño no es legible, el join
+-- vuelve null y en pantalla sale "undefined" en vez del nombre (bug
+-- reportado tras aplicar el fix de arriba). Política actual no versionada
+-- en sql/ → se AÑADE una política nueva y separada, mismo criterio que
+-- asignaciones: solo amplía lectura, nunca toca insert/update/delete (así
+-- un delegado de informes no puede editar el nombre/correo de otro
+-- docente, solo verlo).
+-- ----------------------------------------------------------------------------
+drop policy if exists "leer docentes por permiso delegado" on public.docentes;
+create policy "leer docentes por permiso delegado" on public.docentes
+  for select to authenticated
+  using (tiene_permiso('ver_informes_notas'));
+
+-- ----------------------------------------------------------------------------
 -- Verificación rápida (opcional)
 -- ----------------------------------------------------------------------------
 -- select tablename, policyname, cmd
 -- from pg_policies
--- where tablename in ('asignaciones', 'subparametros')
+-- where tablename in ('asignaciones', 'subparametros', 'docentes')
 -- order by tablename, policyname;

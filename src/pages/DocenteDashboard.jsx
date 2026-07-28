@@ -58,6 +58,19 @@ function IconAlertTriangle({ className }) {
   )
 }
 
+function IconShieldCheck({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  )
+}
+
+// requiereAsignacion: son los módulos "de docencia" — sin un grupo/materia
+// asignado no tienen sentido (llevarían a pantallas vacías). Quien no dicta
+// clase (ej. secretaria, coordinador) no debe verlos, aunque tenga permisos
+// administrativos delegados.
 const MODULOS = [
   {
     ruta: '/asistencia',
@@ -65,6 +78,7 @@ const MODULOS = [
     titulo: 'Llamado a lista',
     descripcion: 'Módulo de asistencia',
     color: 'emerald',
+    requiereAsignacion: true,
   },
   {
     ruta: '/calificaciones/config',
@@ -73,6 +87,7 @@ const MODULOS = [
     descripcion: 'Configurar mi materia',
     color: 'violet',
     controlado: 'calificaciones',
+    requiereAsignacion: true,
   },
   {
     ruta: '/calificaciones',
@@ -81,6 +96,7 @@ const MODULOS = [
     descripcion: 'Capturar calificaciones',
     color: 'sky',
     controlado: 'calificaciones',
+    requiereAsignacion: true,
   },
   {
     ruta: '/dificultades',
@@ -88,6 +104,7 @@ const MODULOS = [
     titulo: 'Marcación de dificultades',
     descripcion: 'Dificultades académicas',
     color: 'red',
+    requiereAsignacion: true,
   },
 ]
 
@@ -116,28 +133,42 @@ const COLORES = {
     titulo: 'text-red-800',
     descripcion: 'text-red-600',
   },
+  slate: {
+    bg: 'bg-slate-50 hover:bg-slate-100 border-slate-200',
+    icono: 'bg-slate-700',
+    titulo: 'text-slate-800',
+    descripcion: 'text-slate-600',
+  },
 }
 
 export default function DocenteDashboard() {
   const { docente } = useAuth()
+  const esAdmin = docente.rol === 'admin'
   const navigate = useNavigate()
   const [modulosActivos, setModulosActivos] = useState(null) // null = cargando
+  const [tieneAsignaciones, setTieneAsignaciones] = useState(null) // null = cargando
+  const [permisos, setPermisos] = useState(null) // null = cargando
 
   useEffect(() => {
-    if (docente.rol === 'admin') {
+    if (esAdmin) {
       setModulosActivos(new Set(MODULOS.map(m => m.controlado).filter(Boolean)))
+      setTieneAsignaciones(true)
+      setPermisos(new Set())
       return
     }
     (async () => {
-      const { data } = await supabase
-        .from('docente_modulos')
-        .select('modulo, activo')
-        .eq('docente_id', docente.id)
-      setModulosActivos(new Set((data || []).filter(m => m.activo).map(m => m.modulo)))
+      const [modRes, asignRes, permRes] = await Promise.all([
+        supabase.from('docente_modulos').select('modulo, activo').eq('docente_id', docente.id),
+        supabase.from('asignaciones').select('id', { count: 'exact', head: true }).eq('docente_id', docente.id),
+        supabase.from('permisos_usuario').select('permiso, activo').eq('docente_id', docente.id),
+      ])
+      setModulosActivos(new Set((modRes.data || []).filter(m => m.activo).map(m => m.modulo)))
+      setTieneAsignaciones((asignRes.count ?? 0) > 0)
+      setPermisos(new Set((permRes.data || []).filter(p => p.activo).map(p => p.permiso)))
     })()
-  }, [docente.id, docente.rol])
+  }, [docente.id, esAdmin])
 
-  if (modulosActivos === null) {
+  if (modulosActivos === null || tieneAsignaciones === null || permisos === null) {
     return (
       <Layout>
         <p className="text-slate-500 text-sm">Cargando...</p>
@@ -145,7 +176,34 @@ export default function DocenteDashboard() {
     )
   }
 
-  const modulosVisibles = MODULOS.filter(m => !m.controlado || modulosActivos.has(m.controlado))
+  const tarjetas = MODULOS.filter(m =>
+    (!m.controlado || modulosActivos.has(m.controlado)) &&
+    (!m.requiereAsignacion || tieneAsignaciones)
+  )
+
+  if (!esAdmin && permisos.size > 0) {
+    tarjetas.push({
+      ruta: '/admin',
+      icono: IconShieldCheck,
+      titulo: 'Panel de administración',
+      descripcion: 'Accesos delegados',
+      color: 'slate',
+    })
+  }
+
+  if (tarjetas.length === 0) {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto bg-white rounded-xl border border-slate-200 p-8 text-center">
+          <h2 className="text-lg font-bold text-slate-800 mb-2">Todavía no tienes accesos asignados</h2>
+          <p className="text-sm text-slate-500">
+            Pídele al administrador que te asigne un grupo y materia, o que te active algún
+            permiso desde Accesos y permisos.
+          </p>
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout>
@@ -153,7 +211,7 @@ export default function DocenteDashboard() {
         <h1 className="text-xl font-bold text-slate-800">Hola, {docente.nombre}</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {modulosVisibles.map(({ ruta, icono: Icono, titulo, descripcion, color }) => {
+          {tarjetas.map(({ ruta, icono: Icono, titulo, descripcion, color }) => {
             const c = COLORES[color]
             return (
               <button

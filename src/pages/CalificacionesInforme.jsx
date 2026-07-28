@@ -81,6 +81,40 @@ export default function CalificacionesInforme() {
   const navigate = useNavigate()
   const notaMinima = config?.nota_minima ?? 70
 
+  // Un delegado con el permiso ver_informes_notas ve el mismo consolidado
+  // completo que un admin (la RLS de notas ya se lo permite, capa 1 de
+  // permisos delegados). Mismo mecanismo de consulta que ProtectedRoute.
+  const [verificandoPermiso, setVerificandoPermiso] = useState(!esAdmin)
+  const [tienePermisoInformes, setTienePermisoInformes] = useState(false)
+
+  useEffect(() => {
+    if (esAdmin) {
+      setTienePermisoInformes(true)
+      setVerificandoPermiso(false)
+      return
+    }
+    let cancelado = false
+    setVerificandoPermiso(true)
+    supabase
+      .from('permisos_usuario')
+      .select('activo')
+      .eq('docente_id', docente.id)
+      .eq('permiso', 'ver_informes_notas')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelado) return
+        setTienePermisoInformes(!!data?.activo)
+        setVerificandoPermiso(false)
+      })
+    return () => { cancelado = true }
+  }, [docente.id, esAdmin])
+
+  // puedeVerTodo reemplaza a esAdmin en toda la lógica de alcance de esta
+  // pantalla (qué carga, qué se ve): admin o delegado con el permiso ven el
+  // consolidado completo de todo el colegio; cualquier otro docente sigue
+  // viendo únicamente sus propias asignaciones, exactamente como hoy.
+  const puedeVerTodo = esAdmin || tienePermisoInformes
+
   const [periodos, setPeriodos] = useState([])
   const [periodoId, setPeriodoId] = useState(null)
   const [grados, setGrados] = useState([])
@@ -97,6 +131,7 @@ export default function CalificacionesInforme() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (verificandoPermiso) return // espera a saber si es delegado con el permiso, evita cargar la vista propia y luego cambiar a la completa
     (async () => {
       const [periodosRes, paramRes] = await Promise.all([
         supabase.from('periodos').select('*').order('created_at', { ascending: false }),
@@ -109,7 +144,7 @@ export default function CalificacionesInforme() {
       setPeriodoId(activo?.id ?? listaPeriodos[0]?.id ?? null)
       setParametros(paramRes.data || [])
 
-      if (esAdmin) {
+      if (puedeVerTodo) {
         const { data: gradosData } = await supabase.from('grados').select('*').order('orden')
         setGrados(gradosData || [])
         setGradoId(gradosData?.[0]?.id ?? null)
@@ -125,10 +160,10 @@ export default function CalificacionesInforme() {
       }
       setCargando(false)
     })()
-  }, [docente.id, esAdmin])
+  }, [docente.id, puedeVerTodo, verificandoPermiso])
 
   useEffect(() => {
-    if (!esAdmin || !gradoId) return
+    if (!puedeVerTodo || !gradoId) return
     ;(async () => {
       const { data: grupo } = await supabase
         .from('grupos').select('id').eq('grado_id', gradoId).eq('letra', letra).single()
@@ -140,7 +175,7 @@ export default function CalificacionesInforme() {
       setAsignaciones(asignData || [])
       setAsignId(asignData?.[0]?.id ?? null)
     })()
-  }, [gradoId, letra, esAdmin])
+  }, [gradoId, letra, puedeVerTodo])
 
   const generarInforme = async () => {
     if (!periodoId || !asignId) return
@@ -152,7 +187,7 @@ export default function CalificacionesInforme() {
     if (!asign) { setGenerando(false); return }
 
     let grupoId = asign.grupo_id
-    if (!grupoId && esAdmin) {
+    if (!grupoId && puedeVerTodo) {
       const { data: grupo } = await supabase
         .from('grupos').select('id').eq('grado_id', gradoId).eq('letra', letra).single()
       grupoId = grupo?.id
@@ -284,7 +319,7 @@ export default function CalificacionesInforme() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(esAdmin ? '/admin' : '/docente')}
+              onClick={() => navigate(puedeVerTodo ? '/admin' : '/docente')}
               className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
             >
               ← Volver
@@ -303,7 +338,7 @@ export default function CalificacionesInforme() {
               </select>
             </div>
 
-            {esAdmin && (
+            {puedeVerTodo && (
               <>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">Grado</label>
@@ -332,7 +367,7 @@ export default function CalificacionesInforme() {
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm">
                 {asignaciones.map(a => (
                   <option key={a.id} value={a.id}>
-                    {esAdmin
+                    {puedeVerTodo
                       ? `${a.materias?.nombre} — ${a.docentes?.nombre}`
                       : `${a.grupos?.grados?.nombre} ${a.grupos?.letra} — ${a.materias?.nombre}`}
                   </option>
@@ -357,7 +392,7 @@ export default function CalificacionesInforme() {
               <div>
                 <div className="font-bold text-slate-800">
                   {informe.asign.grupos?.grados?.nombre} {informe.asign.grupos?.letra} — {informe.asign.materias?.nombre}
-                  {esAdmin && informe.asign.docentes?.nombre && (
+                  {puedeVerTodo && informe.asign.docentes?.nombre && (
                     <span className="text-slate-500 font-normal text-sm ml-2">· {informe.asign.docentes.nombre}</span>
                   )}
                 </div>

@@ -1,7 +1,11 @@
 # Edge Function `admin-docentes`
 
-⚠️ **FALTA EL CÓDIGO.** Hoy esta función vive **únicamente** en el dashboard de Supabase del
-proyecto de producción. Si esa cuenta se pierde o se borra el proyecto, **el código se pierde**.
+✅ **Código versionado en `index.ts`** (rescatado del dashboard el 2026-07-29). Antes vivía
+únicamente dentro del dashboard de Supabase: si esa cuenta se perdía, se perdía el código.
+
+> ⚠️ **`index.ts` debe reflejar exactamente lo que está desplegado.** Si editas la función desde
+> el dashboard, copia el cambio también a este archivo — si divergen, el próximo colegio se monta
+> con una versión distinta a la de producción y nadie lo va a notar hasta que falle.
 
 ## Qué hace
 
@@ -17,14 +21,6 @@ Acciones (parámetro `accion` en el body):
 | `eliminar` | Borra el usuario de Auth y su fila de `docentes` (cascada borra `asignaciones`; las `marcas` se conservan) |
 | `reset_password` | Cambia la contraseña y marca `debe_cambiar_password: true` |
 | `cambiar_email` | Cambia el correo en Auth y en `docentes` |
-
-## Cómo traer el código hasta acá (hacerlo una sola vez)
-
-1. Entra a [supabase.com/dashboard](https://supabase.com/dashboard) → proyecto de producción.
-2. Menú lateral → **Edge Functions** → clic en **`admin-docentes`**.
-3. Abre el editor de código, selecciona todo (Ctrl+A) y copia (Ctrl+C).
-4. Crea `index.ts` **en esta misma carpeta** y pega el contenido.
-5. Commit. Borra la advertencia de arriba de este archivo.
 
 ## Cómo desplegarla en un colegio nuevo
 

@@ -15,6 +15,7 @@ Guion técnico para montar esta app en un colegio distinto. Arquitectura vigente
 |---|---|---|
 | `sql/00-esquema-completo.sql` | Esquema completo: 17 tablas, 6 funciones, 1 trigger, 9 índices y **47 políticas RLS**. Sin datos. | ✅ |
 | `sql/01-semilla.sql` | Datos base: `grados`, `grupos`, fila `configuracion`. Parametrizable por colegio. | ✅ |
+| `sql/02-storage.sql` | Bucket `logos` + sus 3 políticas (lectura pública, escritura solo admin) | ✅ |
 | `sql/2026-*.sql` | Migraciones históricas incrementales (referencia, ya incluidas en el esquema) | ✅ |
 | `supabase/functions/admin-docentes/` | Edge Function de gestión de cuentas | ⏳ falta `index.ts` |
 | `plantillas/*.xlsx` | Plantillas de importación para enviar al colegio | ✅ |
@@ -76,9 +77,10 @@ PGPASSWORD='LA_CONTRASEÑA_DE_LA_BD' \
 3. **SQL Editor** → ajustar `sql/01-semilla.sql` a los grados/grupos reales del colegio → **Run**.
 4. **Authentication → Policies**: verificar que **ninguna** tabla diga *"RLS is not enabled"*.
 5. **Edge Functions** → crear `admin-docentes` (ver su README) → **Deploy**.
-6. **Storage** → **New bucket** → nombre **`logos`** → marcar **Public bucket** → **Create**.
-   ⚠️ **No lo trae el esquema.** El dump es solo del esquema `public` y los buckets viven en el
-   esquema `storage`. Sin este paso, subir el logo de la institución falla desde `/admin`.
+6. **SQL Editor** → pegar `sql/02-storage.sql` → **Run**. Crea el bucket `logos` y sus políticas.
+   ⚠️ **No lo trae `00-esquema-completo.sql`**: ese dump es del esquema `public`, y los buckets
+   y sus políticas viven en el esquema `storage`. Sin este paso, subir el logo falla con
+   *"new row violates row-level security policy"*.
 7. Crear el primer admin (ver abajo).
 8. **Project Settings → API**: copiar **Project URL** y **anon key**.
    ⚠️ La `service_role` key **no** se copia a ningún lado.

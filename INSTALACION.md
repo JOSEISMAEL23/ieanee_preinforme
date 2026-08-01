@@ -15,6 +15,7 @@ Guion técnico para montar esta app en un colegio distinto. Arquitectura vigente
 |---|---|---|
 | `sql/00-esquema-completo.sql` | Esquema completo: 17 tablas, 6 funciones, 1 trigger, 9 índices y **47 políticas RLS**. Sin datos. | ✅ |
 | `sql/01-semilla.sql` | Datos base: `grados`, `grupos`, fila `configuracion`. Parametrizable por colegio. | ✅ |
+| `sql/02-storage.sql` | Bucket `logos` + sus 3 políticas (lectura pública, escritura solo admin) | ✅ |
 | `sql/2026-*.sql` | Migraciones históricas incrementales (referencia, ya incluidas en el esquema) | ✅ |
 | `supabase/functions/admin-docentes/` | Edge Function de gestión de cuentas | ⏳ falta `index.ts` |
 | `plantillas/*.xlsx` | Plantillas de importación para enviar al colegio | ✅ |
@@ -45,13 +46,21 @@ PGPASSWORD='LA_CONTRASEÑA_DE_LA_BD' \
 > ⚠️ **No uses la "Direct connection" (`db.<ref>.supabase.co`)**: solo resuelve por IPv6 y falla
 > en la mayoría de redes domésticas y de colegio. Siempre el **Session pooler**.
 
-### Después de regenerar, reaplicar SIEMPRE estos dos ajustes
+### Después de regenerar, reaplicar SIEMPRE estos tres ajustes
 
-`pg_dump` genera dos cosas que el **SQL Editor de Supabase rechaza**:
+`pg_dump` genera tres cosas que el **SQL Editor de Supabase rechaza**:
 
 1. Las líneas `\restrict` y `\unrestrict` (metacomandos de psql) → **borrarlas**. Si no, falla en
    la primera línea con un error de sintaxis desconcertante.
 2. `CREATE SCHEMA public;` → **comentarla**. Ese esquema ya existe en cualquier proyecto nuevo.
+3. Las **24 líneas `ALTER DEFAULT PRIVILEGES`** y el `COMMENT ON SCHEMA public` → **comentarlas**
+   (en el archivo van marcadas con `-- [kit]`). El SQL Editor corre como el rol `postgres`, que no
+   puede cambiar los privilegios por defecto de otro rol (`supabase_admin`), y falla con
+   `ERROR: 42501: permission denied to change default privileges`. Son innecesarias: todo
+   proyecto nuevo ya trae esos privilegios configurados igual.
+
+> El ajuste 3 se detectó **ejecutando el kit de verdad**, no leyéndolo. Por eso el ensayo en un
+> proyecto desechable es obligatorio antes de montar un cliente.
 
 > Repite este dump **cada vez que cambies el esquema en producción**, o el kit queda desfasado
 > y el próximo colegio nacerá con una base de datos incompleta.
@@ -68,8 +77,12 @@ PGPASSWORD='LA_CONTRASEÑA_DE_LA_BD' \
 3. **SQL Editor** → ajustar `sql/01-semilla.sql` a los grados/grupos reales del colegio → **Run**.
 4. **Authentication → Policies**: verificar que **ninguna** tabla diga *"RLS is not enabled"*.
 5. **Edge Functions** → crear `admin-docentes` (ver su README) → **Deploy**.
-6. Crear el primer admin (ver abajo).
-7. **Project Settings → API**: copiar **Project URL** y **anon key**.
+6. **SQL Editor** → pegar `sql/02-storage.sql` → **Run**. Crea el bucket `logos` y sus políticas.
+   ⚠️ **No lo trae `00-esquema-completo.sql`**: ese dump es del esquema `public`, y los buckets
+   y sus políticas viven en el esquema `storage`. Sin este paso, subir el logo falla con
+   *"new row violates row-level security policy"*.
+7. Crear el primer admin (ver abajo).
+8. **Project Settings → API**: copiar **Project URL** y **anon key**.
    ⚠️ La `service_role` key **no** se copia a ningún lado.
 
 ### 2. Primer usuario administrador
@@ -80,23 +93,20 @@ crea a mano:
 1. **Authentication → Users → Add user → Create new user**.
 2. Correo del admin + contraseña temporal.
 3. ✅ **Marcar "Auto Confirm User"** — sin esto el usuario **no podrá iniciar sesión nunca**.
-4. Copiar el **UUID** del usuario creado.
-5. SQL Editor:
+4. SQL Editor — **no hay que copiar el UUID a mano**, la consulta lo busca sola por correo
+   (pegar un UUID manualmente es la forma más fácil de romper el `INSERT`):
 
 ```sql
 insert into docentes (user_id, nombre, email, rol, activo, debe_cambiar_password, cargo)
-values (
-  'UUID_DEL_PASO_4',
-  'Nombre Completo Del Admin',
-  'correo@delcolegio.edu.co',
-  'admin',
-  true,
-  true,
-  'Administrador'
-);
+select id, 'Nombre Completo Del Admin', email, 'admin', true, true, 'Administrador'
+from auth.users
+where email = 'correo@delcolegio.edu.co';   -- << el mismo del paso 2
 ```
 
-6. Verificar:
+> `debe_cambiar_password = true` obliga al admin del colegio a cambiar la contraseña temporal
+> en su primer ingreso. Es lo correcto: tú no debes conocer su contraseña definitiva.
+
+5. Verificar:
 
 ```sql
 select d.nombre, d.rol, u.email_confirmed_at

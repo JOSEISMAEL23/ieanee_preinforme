@@ -94,9 +94,9 @@ on conflict (id) do nothing;
 insert into public.parametros (nombre, porcentaje, orden)
 select v.nombre, v.porcentaje, v.orden
 from (values
-  ('Saber', 40::numeric, 1),          -- << AJUSTAR
-  ('Hacer', 40::numeric, 2),          -- << AJUSTAR
-  ('Ser',   20::numeric, 3)           -- << AJUSTAR  (los tres suman 100)
+  ('Saber', 60::numeric, 1),          -- << AJUSTAR
+  ('Hacer', 30::numeric, 2),          -- << AJUSTAR
+  ('Ser',   10::numeric, 3)           -- << AJUSTAR  (los tres suman 100)
 ) as v(nombre, porcentaje, orden)
 where not exists (select 1 from public.parametros);
 

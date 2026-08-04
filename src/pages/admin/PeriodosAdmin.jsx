@@ -9,6 +9,10 @@ function aInputLocal(fechaISO) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function aISO(valorInput) {
+  return valorInput ? new Date(valorInput).toISOString() : null
+}
+
 function estadoModulo(activo, fechaInicio, fechaLimite) {
   const ahora = new Date()
   if (!activo) return { texto: 'Inactivo', tono: 'gris' }
@@ -43,29 +47,126 @@ function ResumenFechas({ inicio, limite }) {
   )
 }
 
+// ── Formulario ───────────────────────────────────────────────────────────────
+// Crear y editar comparten estos mismos campos. Antes el panel de edición solo
+// tenía las fechas y repetía ese bloque de JSX casi idéntico al de creación;
+// unificarlos es lo que permite que al editar también se toquen nombre y año
+// sin mantener dos formularios en paralelo.
+
+const formVacio = () => ({
+  nombre: '',
+  anio: String(anioActual()),
+  fecha_inicio: '',
+  fecha_limite: '',
+  asistencia_fecha_inicio: '',
+  asistencia_fecha_limite: '',
+  calificacion_fecha_inicio: '',
+  calificacion_fecha_limite: '',
+})
+
+/** Vuelca una fila de la base en el formulario, con las fechas en formato datetime-local. */
+const formDesdePeriodo = (p) => ({
+  nombre: p.nombre ?? '',
+  anio: p.anio != null ? String(p.anio) : String(anioActual()),
+  fecha_inicio: aInputLocal(p.fecha_inicio),
+  fecha_limite: aInputLocal(p.fecha_limite),
+  asistencia_fecha_inicio: aInputLocal(p.asistencia_fecha_inicio),
+  asistencia_fecha_limite: aInputLocal(p.asistencia_fecha_limite),
+  calificacion_fecha_inicio: aInputLocal(p.calificacion_fecha_inicio),
+  calificacion_fecha_limite: aInputLocal(p.calificacion_fecha_limite),
+})
+
+const VENTANAS = [
+  {
+    titulo: '📋 Ventana — Marcas de dificultad',
+    borde: 'border-slate-200 bg-slate-50',
+    texto: 'text-slate-600',
+    inicio: 'fecha_inicio',
+    limite: 'fecha_limite',
+  },
+  {
+    titulo: '🗓 Ventana — Asistencia',
+    borde: 'border-blue-200 bg-blue-50',
+    texto: 'text-blue-700',
+    inicio: 'asistencia_fecha_inicio',
+    limite: 'asistencia_fecha_limite',
+  },
+  {
+    titulo: '🎓 Ventana — Calificaciones',
+    borde: 'border-violet-200 bg-violet-50',
+    texto: 'text-violet-700',
+    inicio: 'calificacion_fecha_inicio',
+    limite: 'calificacion_fecha_limite',
+  },
+]
+
+function FormularioPeriodo({ valores, onCambio, opcionalEnFechas }) {
+  const set = (campo) => (e) => onCambio({ ...valores, [campo]: e.target.value })
+  const sufijo = opcionalEnFechas ? ' (opcional)' : ''
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* El año va aparte del nombre: así "Primer Periodo" se puede volver
+          a usar el año entrante sin chocar con el de este año. */}
+      <div className="flex gap-2 flex-wrap">
+        <div className="flex-1 min-w-[12rem] max-w-xs">
+          <label className="text-xs text-slate-500 block mb-1">Nombre del periodo</label>
+          <input
+            value={valores.nombre}
+            onChange={set('nombre')}
+            placeholder='Ej: "Primer Periodo"'
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
+          />
+        </div>
+        <div className="w-28">
+          <label className="text-xs text-slate-500 block mb-1">Año</label>
+          <input
+            type="number"
+            min="2000"
+            max="2100"
+            value={valores.anio}
+            onChange={set('anio')}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
+          />
+        </div>
+      </div>
+
+      {VENTANAS.map(v => (
+        <div key={v.inicio} className={`rounded-lg border p-4 flex flex-col gap-2 ${v.borde}`}>
+          <p className={`text-xs font-bold uppercase tracking-wide ${v.texto}`}>{v.titulo}</p>
+          <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Inicio{sufijo}</label>
+              <input type="datetime-local" value={valores[v.inicio]}
+                onChange={set(v.inicio)}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">Plazo límite{sufijo}</label>
+              <input type="datetime-local" value={valores[v.limite]}
+                onChange={set(v.limite)}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Pantalla ─────────────────────────────────────────────────────────────────
+
 export default function PeriodosAdmin() {
   const [periodos, setPeriodos]       = useState(null)
-  const [nombre, setNombre]           = useState('')
-  const [anio, setAnio]               = useState(String(anioActual()))
-  const [guardando, setGuardando]     = useState(false)
+  // 'crear' | id del periodo que se está guardando | null. Guardar el "qué" y
+  // no solo un booleano evita que el botón de crear se ponga en "Guardando..."
+  // mientras lo que se está guardando es la edición de una fila.
+  const [guardando, setGuardando]     = useState(null)
   const [mensaje, setMensaje]         = useState('')
   const [editandoId, setEditandoId]   = useState(null)
 
-  // Fechas del formulario de creación
-  const [cDifInicio,  setCDifInicio]  = useState('')
-  const [cDifLimite,  setCDifLimite]  = useState('')
-  const [cAsisInicio, setCAsisInicio] = useState('')
-  const [cAsisLimite, setCAsisLimite] = useState('')
-  const [cCalInicio,  setCCalInicio]  = useState('')
-  const [cCalLimite,  setCCalLimite]  = useState('')
-
-  // Fechas del formulario de edición
-  const [eDifInicio,  setEDifInicio]  = useState('')
-  const [eDifLimite,  setEDifLimite]  = useState('')
-  const [eAsisInicio, setEAsisInicio] = useState('')
-  const [eAsisLimite, setEAsisLimite] = useState('')
-  const [eCalInicio,  setECalInicio]  = useState('')
-  const [eCalLimite,  setECalLimite]  = useState('')
+  const [formCrear, setFormCrear]     = useState(formVacio)
+  const [formEditar, setFormEditar]   = useState(formVacio)
 
   const cargar = async () => {
     const { data } = await supabase
@@ -86,77 +187,96 @@ export default function PeriodosAdmin() {
     cargar()
   }
 
-  const crearYActivar = async () => {
-    const nombreLimpio = nombre.trim()
-    const anioNum = Number(anio)
-    if (!nombreLimpio) return
+  /**
+   * Valida el formulario y comprueba que (nombre, anio) esté libre.
+   *
+   * `idExcluido` es lo que hace posible editar: al guardar un periodo hay que
+   * ignorar su propia fila en el chequeo de duplicados, porque si no, guardar
+   * sin cambiarle el nombre chocaría siempre contra sí mismo. Al crear se pasa
+   * null y no se excluye nada.
+   */
+  const validar = async (form, idExcluido) => {
+    const nombreLimpio = form.nombre.trim()
+    if (!nombreLimpio) return { error: 'El nombre del periodo no puede quedar vacío.' }
+
+    const anioNum = Number(form.anio)
     if (!Number.isInteger(anioNum) || anioNum < 2000 || anioNum > 2100) {
-      setMensaje('El año debe ser un número entre 2000 y 2100.')
-      return
+      return { error: 'El año debe ser un número entre 2000 y 2100.' }
     }
-    setGuardando(true)
-    setMensaje('')
 
-    // El duplicado se mira por nombre + año: "Primer Periodo" puede repetirse
-    // en años distintos, que es justo lo que esta pantalla tiene que permitir.
-    const { data: existente } = await supabase
+    let consulta = supabase
       .from('periodos').select('id')
-      .eq('nombre', nombreLimpio).eq('anio', anioNum).maybeSingle()
+      .eq('nombre', nombreLimpio).eq('anio', anioNum)
+    if (idExcluido != null) consulta = consulta.neq('id', idExcluido)
 
+    const { data: existente } = await consulta.maybeSingle()
     if (existente) {
-      setGuardando(false)
-      setMensaje(`Ya existe un periodo llamado "${nombreLimpio}" en ${anioNum}.`)
-      return
+      return { error: `Ya existe un periodo llamado "${nombreLimpio}" en ${anioNum}.` }
     }
+
+    return { nombreLimpio, anioNum }
+  }
+
+  const camposFecha = (form) => ({
+    fecha_inicio:              aISO(form.fecha_inicio),
+    fecha_limite:              aISO(form.fecha_limite),
+    asistencia_fecha_inicio:   aISO(form.asistencia_fecha_inicio),
+    asistencia_fecha_limite:   aISO(form.asistencia_fecha_limite),
+    calificacion_fecha_inicio: aISO(form.calificacion_fecha_inicio),
+    calificacion_fecha_limite: aISO(form.calificacion_fecha_limite),
+  })
+
+  const crearYActivar = async () => {
+    setMensaje('')
+    setGuardando('crear')
+
+    const { error: errorValidacion, nombreLimpio, anioNum } = await validar(formCrear, null)
+    if (errorValidacion) { setGuardando(null); setMensaje(errorValidacion); return }
 
     await supabase.from('periodos').update({ activo: false }).eq('activo', true)
     const { error } = await supabase.from('periodos').insert({
       nombre: nombreLimpio,
       anio: anioNum,
       activo: true,
-      fecha_inicio:              cDifInicio  ? new Date(cDifInicio).toISOString()  : null,
-      fecha_limite:              cDifLimite  ? new Date(cDifLimite).toISOString()  : null,
-      asistencia_fecha_inicio:   cAsisInicio ? new Date(cAsisInicio).toISOString() : null,
-      asistencia_fecha_limite:   cAsisLimite ? new Date(cAsisLimite).toISOString() : null,
-      calificacion_fecha_inicio: cCalInicio  ? new Date(cCalInicio).toISOString()  : null,
-      calificacion_fecha_limite: cCalLimite  ? new Date(cCalLimite).toISOString()  : null,
+      ...camposFecha(formCrear),
     })
-    setGuardando(false)
+    setGuardando(null)
 
     if (error) { setMensaje('Error al crear: ' + error.message); return }
-    setNombre('')
-    setAnio(String(anioActual()))
-    setCDifInicio(''); setCDifLimite('')
-    setCAsisInicio(''); setCAsisLimite('')
-    setCCalInicio(''); setCCalLimite('')
+    setFormCrear(formVacio())
     setMensaje(`Periodo "${nombreLimpio}" (${anioNum}) creado y activado.`)
     cargar()
   }
 
   const iniciarEdicion = (p) => {
+    setMensaje('')
     setEditandoId(p.id)
-    setEDifInicio(aInputLocal(p.fecha_inicio))
-    setEDifLimite(aInputLocal(p.fecha_limite))
-    setEAsisInicio(aInputLocal(p.asistencia_fecha_inicio))
-    setEAsisLimite(aInputLocal(p.asistencia_fecha_limite))
-    setECalInicio(aInputLocal(p.calificacion_fecha_inicio))
-    setECalLimite(aInputLocal(p.calificacion_fecha_limite))
+    setFormEditar(formDesdePeriodo(p))
   }
 
-  const guardarFechas = async (p) => {
+  const guardarEdicion = async (p) => {
+    setMensaje('')
+    setGuardando(p.id)
+
+    const { error: errorValidacion, nombreLimpio, anioNum } = await validar(formEditar, p.id)
+    if (errorValidacion) { setGuardando(null); setMensaje(errorValidacion); return }
+
+    // `activo` se deja fuera a propósito: activar un periodo es una acción
+    // aparte (el botón "Activar"), y meterla aquí desactivaría los demás sin
+    // que el admin lo haya pedido.
     const { error } = await supabase
       .from('periodos')
       .update({
-        fecha_inicio:            eDifInicio  ? new Date(eDifInicio).toISOString()  : null,
-        fecha_limite:            eDifLimite  ? new Date(eDifLimite).toISOString()  : null,
-        asistencia_fecha_inicio: eAsisInicio ? new Date(eAsisInicio).toISOString() : null,
-        asistencia_fecha_limite: eAsisLimite ? new Date(eAsisLimite).toISOString() : null,
-        calificacion_fecha_inicio: eCalInicio ? new Date(eCalInicio).toISOString() : null,
-        calificacion_fecha_limite: eCalLimite ? new Date(eCalLimite).toISOString() : null,
+        nombre: nombreLimpio,
+        anio: anioNum,
+        ...camposFecha(formEditar),
       })
       .eq('id', p.id)
-    if (error) { setMensaje('Error al guardar fechas: ' + error.message); return }
+    setGuardando(null)
+
+    if (error) { setMensaje('Error al guardar: ' + error.message); return }
     setEditandoId(null)
+    setMensaje(`Periodo "${nombreLimpio}" (${anioNum}) actualizado.`)
     cargar()
   }
 
@@ -172,102 +292,16 @@ export default function PeriodosAdmin() {
         </p>
 
         {/* ── Formulario de creación ── */}
-        <div className="flex flex-col gap-3 mb-2">
-          {/* El año va aparte del nombre: así "Primer Periodo" se puede volver
-              a usar el año entrante sin chocar con el de este año. */}
-          <div className="flex gap-2 flex-wrap">
-            <div className="flex-1 min-w-[12rem] max-w-xs">
-              <label className="text-xs text-slate-500 block mb-1">Nombre del periodo</label>
-              <input
-                value={nombre}
-                onChange={e => setNombre(e.target.value)}
-                placeholder='Ej: "Primer Periodo"'
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
-              />
-            </div>
-            <div className="w-28">
-              <label className="text-xs text-slate-500 block mb-1">Año</label>
-              <input
-                type="number"
-                min="2000"
-                max="2100"
-                value={anio}
-                onChange={e => setAnio(e.target.value)}
-                className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
-              />
-            </div>
-          </div>
-
-          {/* Dificultades */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex flex-col gap-2">
-            <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-              📋 Ventana — Marcas de dificultad
-            </p>
-            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">Inicio (opcional)</label>
-                <input type="datetime-local" value={cDifInicio}
-                  onChange={e => setCDifInicio(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">Plazo límite (opcional)</label>
-                <input type="datetime-local" value={cDifLimite}
-                  onChange={e => setCDifLimite(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-              </div>
-            </div>
-          </div>
-
-          {/* Asistencia */}
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 flex flex-col gap-2">
-            <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">
-              🗓 Ventana — Asistencia
-            </p>
-            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">Inicio (opcional)</label>
-                <input type="datetime-local" value={cAsisInicio}
-                  onChange={e => setCAsisInicio(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">Plazo límite (opcional)</label>
-                <input type="datetime-local" value={cAsisLimite}
-                  onChange={e => setCAsisLimite(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-              </div>
-            </div>
-          </div>
-
-          {/* Calificaciones */}
-          <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 flex flex-col gap-2">
-            <p className="text-xs font-bold text-violet-700 uppercase tracking-wide">
-              🎓 Ventana — Calificaciones
-            </p>
-            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">Inicio (opcional)</label>
-                <input type="datetime-local" value={cCalInicio}
-                  onChange={e => setCCalInicio(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-              </div>
-              <div>
-                <label className="text-xs text-slate-500 block mb-1">Plazo límite (opcional)</label>
-                <input type="datetime-local" value={cCalLimite}
-                  onChange={e => setCCalLimite(e.target.value)}
-                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-              </div>
-            </div>
-          </div>
+        <div className="mb-2">
+          <FormularioPeriodo valores={formCrear} onCambio={setFormCrear} opcionalEnFechas />
         </div>
 
         <button
           onClick={crearYActivar}
-          disabled={guardando || !nombre.trim() || !anio.trim()}
-          className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40 mb-6"
+          disabled={guardando !== null || !formCrear.nombre.trim() || !formCrear.anio.trim()}
+          className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40 mt-3 mb-6"
         >
-          {guardando ? 'Creando...' : 'Crear y activar'}
+          {guardando === 'crear' ? 'Creando...' : 'Crear y activar'}
         </button>
 
         {/* ── Lista de periodos ── */}
@@ -294,12 +328,12 @@ export default function PeriodosAdmin() {
                     )}
                     <button onClick={() => editandoId === p.id ? setEditandoId(null) : iniciarEdicion(p)}
                       className="text-xs text-slate-500 hover:text-slate-800 font-semibold">
-                      {editandoId === p.id ? 'Cerrar' : 'Editar fechas'}
+                      {editandoId === p.id ? 'Cerrar' : 'Editar'}
                     </button>
                   </div>
                 </div>
 
-                {/* Resumen de los dos módulos */}
+                {/* Resumen de los tres módulos */}
                 <div className="mt-2 flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 w-32 shrink-0">📋 Dificultades</span>
@@ -321,71 +355,13 @@ export default function PeriodosAdmin() {
                 {/* Panel de edición inline */}
                 {editandoId === p.id && (
                   <div className="mt-3 pt-3 border-t border-slate-200 flex flex-col gap-3">
-
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 flex flex-col gap-2">
-                      <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                        📋 Ventana — Marcas de dificultad
-                      </p>
-                      <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                        <div>
-                          <label className="text-xs text-slate-500 block mb-1">Inicio</label>
-                          <input type="datetime-local" value={eDifInicio}
-                            onChange={e => setEDifInicio(e.target.value)}
-                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-                        </div>
-                        <div>
-                          <label className="text-xs text-slate-500 block mb-1">Plazo límite</label>
-                          <input type="datetime-local" value={eDifLimite}
-                            onChange={e => setEDifLimite(e.target.value)}
-                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 flex flex-col gap-2">
-                      <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">
-                        🗓 Ventana — Asistencia
-                      </p>
-                      <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                        <div>
-                          <label className="text-xs text-slate-500 block mb-1">Inicio</label>
-                          <input type="datetime-local" value={eAsisInicio}
-                            onChange={e => setEAsisInicio(e.target.value)}
-                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-                        </div>
-                        <div>
-                          <label className="text-xs text-slate-500 block mb-1">Plazo límite</label>
-                          <input type="datetime-local" value={eAsisLimite}
-                            onChange={e => setEAsisLimite(e.target.value)}
-                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 flex flex-col gap-2">
-                      <p className="text-xs font-bold text-violet-700 uppercase tracking-wide">
-                        🎓 Ventana — Calificaciones
-                      </p>
-                      <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                        <div>
-                          <label className="text-xs text-slate-500 block mb-1">Inicio</label>
-                          <input type="datetime-local" value={eCalInicio}
-                            onChange={e => setECalInicio(e.target.value)}
-                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-                        </div>
-                        <div>
-                          <label className="text-xs text-slate-500 block mb-1">Plazo límite</label>
-                          <input type="datetime-local" value={eCalLimite}
-                            onChange={e => setECalLimite(e.target.value)}
-                            className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full" />
-                        </div>
-                      </div>
-                    </div>
+                    <FormularioPeriodo valores={formEditar} onCambio={setFormEditar} />
 
                     <div className="flex gap-2">
-                      <button onClick={() => guardarFechas(p)}
-                        className="bg-emerald-800 text-white px-3 py-2 rounded-lg text-xs font-semibold">
-                        Guardar cambios
+                      <button onClick={() => guardarEdicion(p)}
+                        disabled={guardando !== null || !formEditar.nombre.trim() || !formEditar.anio.trim()}
+                        className="bg-emerald-800 text-white px-3 py-2 rounded-lg text-xs font-semibold disabled:opacity-40">
+                        {guardando === p.id ? 'Guardando...' : 'Guardar cambios'}
                       </button>
                       <button onClick={() => setEditandoId(null)}
                         className="bg-white border border-slate-300 text-slate-600 px-3 py-2 rounded-lg text-xs font-semibold">

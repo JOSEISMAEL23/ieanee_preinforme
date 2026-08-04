@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { etiquetaPeriodoConEstado } from '../lib/periodos'
 
 // Acepta coma decimal ("85,5") además de punto.
 function aNumero(v) {
@@ -289,7 +290,7 @@ export default function CalificacionesCaptura() {
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
               >
                 {periodos.map(p => (
-                  <option key={p.id} value={p.id}>{p.nombre}{p.activo ? ' (activo)' : ''}</option>
+                  <option key={p.id} value={p.id}>{etiquetaPeriodoConEstado(p)}</option>
                 ))}
               </select>
             </div>

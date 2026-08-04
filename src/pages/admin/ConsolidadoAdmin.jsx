@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
+import { etiquetaPeriodo, etiquetaPeriodoConEstado } from '../../lib/periodos'
 import { useConfiguracion } from '../../context/ConfiguracionContext'
 
 const LETRAS = ['A', 'B', 'C']
@@ -78,7 +79,7 @@ export default function ConsolidadoAdmin() {
     const ws = XLSX.utils.aoa_to_sheet([header, ...filas])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, `${grado.nombre} ${letra}`.slice(0, 31))
-    XLSX.writeFile(wb, `Consolidado_${grado.nombre}${letra}_${periodo?.nombre ?? ''}.xlsx`)
+    XLSX.writeFile(wb, `Consolidado_${grado.nombre}${letra}_${etiquetaPeriodo(periodo)}.xlsx`)
   }
 
   const exportarTodoExcel = async () => {
@@ -124,7 +125,7 @@ export default function ConsolidadoAdmin() {
     const resumenWs = XLSX.utils.aoa_to_sheet(resumenFilas)
     XLSX.utils.book_append_sheet(wb, resumenWs, 'Resumen')
     wb.SheetNames.unshift(wb.SheetNames.pop())
-    XLSX.writeFile(wb, `Consolidado_completo_${periodo?.nombre ?? ''}.xlsx`)
+    XLSX.writeFile(wb, `Consolidado_completo_${etiquetaPeriodo(periodo)}.xlsx`)
 
     setExportandoTodo(false)
     setMensaje('Consolidado completo de los 36 grupos descargado.')
@@ -142,7 +143,7 @@ export default function ConsolidadoAdmin() {
           <select value={periodoId ?? ''} onChange={e => setPeriodoId(Number(e.target.value))}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm">
             {periodos.map(p => (
-              <option key={p.id} value={p.id}>{p.nombre}{p.activo ? ' (activo)' : ''}</option>
+              <option key={p.id} value={p.id}>{etiquetaPeriodoConEstado(p)}</option>
             ))}
           </select>
           <select value={gradoId ?? ''} onChange={e => setGradoId(Number(e.target.value))}
@@ -329,7 +330,7 @@ function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificu
         <div className="text-center">
           <p className="text-[10px] font-semibold text-slate-700 mb-0.5">{nombreInstitucion}</p>
           <p className="font-bold text-[12px]">
-            INFORME PARCIAL {periodo?.nombre?.toUpperCase() ?? '____________'} — {grado?.nombre?.toUpperCase()}
+            INFORME PARCIAL {etiquetaPeriodo(periodo).toUpperCase() || '____________'} — {grado?.nombre?.toUpperCase()}
           </p>
         </div>
         <div />

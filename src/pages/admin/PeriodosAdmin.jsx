@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { anioActual } from '../../lib/periodos'
 
 function aInputLocal(fechaISO) {
   if (!fechaISO) return ''
@@ -45,6 +46,7 @@ function ResumenFechas({ inicio, limite }) {
 export default function PeriodosAdmin() {
   const [periodos, setPeriodos]       = useState(null)
   const [nombre, setNombre]           = useState('')
+  const [anio, setAnio]               = useState(String(anioActual()))
   const [guardando, setGuardando]     = useState(false)
   const [mensaje, setMensaje]         = useState('')
   const [editandoId, setEditandoId]   = useState(null)
@@ -69,6 +71,7 @@ export default function PeriodosAdmin() {
     const { data } = await supabase
       .from('periodos')
       .select('*')
+      .order('anio', { ascending: false })
       .order('created_at', { ascending: false })
     setPeriodos(data || [])
   }
@@ -85,22 +88,31 @@ export default function PeriodosAdmin() {
 
   const crearYActivar = async () => {
     const nombreLimpio = nombre.trim()
+    const anioNum = Number(anio)
     if (!nombreLimpio) return
+    if (!Number.isInteger(anioNum) || anioNum < 2000 || anioNum > 2100) {
+      setMensaje('El año debe ser un número entre 2000 y 2100.')
+      return
+    }
     setGuardando(true)
     setMensaje('')
 
+    // El duplicado se mira por nombre + año: "Primer Periodo" puede repetirse
+    // en años distintos, que es justo lo que esta pantalla tiene que permitir.
     const { data: existente } = await supabase
-      .from('periodos').select('id').eq('nombre', nombreLimpio).single()
+      .from('periodos').select('id')
+      .eq('nombre', nombreLimpio).eq('anio', anioNum).maybeSingle()
 
     if (existente) {
       setGuardando(false)
-      setMensaje('Ya existe un periodo con ese nombre.')
+      setMensaje(`Ya existe un periodo llamado "${nombreLimpio}" en ${anioNum}.`)
       return
     }
 
     await supabase.from('periodos').update({ activo: false }).eq('activo', true)
     const { error } = await supabase.from('periodos').insert({
       nombre: nombreLimpio,
+      anio: anioNum,
       activo: true,
       fecha_inicio:              cDifInicio  ? new Date(cDifInicio).toISOString()  : null,
       fecha_limite:              cDifLimite  ? new Date(cDifLimite).toISOString()  : null,
@@ -113,10 +125,11 @@ export default function PeriodosAdmin() {
 
     if (error) { setMensaje('Error al crear: ' + error.message); return }
     setNombre('')
+    setAnio(String(anioActual()))
     setCDifInicio(''); setCDifLimite('')
     setCAsisInicio(''); setCAsisLimite('')
     setCCalInicio(''); setCCalLimite('')
-    setMensaje(`Periodo "${nombreLimpio}" creado y activado.`)
+    setMensaje(`Periodo "${nombreLimpio}" (${anioNum}) creado y activado.`)
     cargar()
   }
 
@@ -160,12 +173,30 @@ export default function PeriodosAdmin() {
 
         {/* ── Formulario de creación ── */}
         <div className="flex flex-col gap-3 mb-2">
-          <input
-            value={nombre}
-            onChange={e => setNombre(e.target.value)}
-            placeholder='Ej: "Periodo 1 - 2026"'
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm max-w-xs"
-          />
+          {/* El año va aparte del nombre: así "Primer Periodo" se puede volver
+              a usar el año entrante sin chocar con el de este año. */}
+          <div className="flex gap-2 flex-wrap">
+            <div className="flex-1 min-w-[12rem] max-w-xs">
+              <label className="text-xs text-slate-500 block mb-1">Nombre del periodo</label>
+              <input
+                value={nombre}
+                onChange={e => setNombre(e.target.value)}
+                placeholder='Ej: "Primer Periodo"'
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
+              />
+            </div>
+            <div className="w-28">
+              <label className="text-xs text-slate-500 block mb-1">Año</label>
+              <input
+                type="number"
+                min="2000"
+                max="2100"
+                value={anio}
+                onChange={e => setAnio(e.target.value)}
+                className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
+              />
+            </div>
+          </div>
 
           {/* Dificultades */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 flex flex-col gap-2">
@@ -233,7 +264,7 @@ export default function PeriodosAdmin() {
 
         <button
           onClick={crearYActivar}
-          disabled={guardando || !nombre.trim()}
+          disabled={guardando || !nombre.trim() || !anio.trim()}
           className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40 mb-6"
         >
           {guardando ? 'Creando...' : 'Crear y activar'}
@@ -250,7 +281,10 @@ export default function PeriodosAdmin() {
 
                 {/* Cabecera */}
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-800">{p.nombre}</div>
+                  <div className="text-sm font-semibold text-slate-800">
+                    {p.nombre}
+                    {p.anio && <span className="ml-2 text-xs font-bold text-slate-500">{p.anio}</span>}
+                  </div>
                   <div className="flex items-center gap-2">
                     {!p.activo && (
                       <button onClick={() => activar(p.id)}

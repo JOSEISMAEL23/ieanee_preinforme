@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { etiquetaPeriodoConEstado } from '../lib/periodos'
 
 const ESTADOS = [
   { key: 'asiste', label: 'Asiste', bg: 'bg-emerald-100', texto: 'text-emerald-800', borde: 'border-emerald-500', activo: 'bg-emerald-500 text-white border-emerald-500' },
@@ -328,7 +329,7 @@ export default function AsistenciaDashboard() {
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full"
               >
                 {periodos.map(p => (
-                  <option key={p.id} value={p.id}>{p.nombre}{p.activo ? ' (activo)' : ''}</option>
+                  <option key={p.id} value={p.id}>{etiquetaPeriodoConEstado(p)}</option>
                 ))}
               </select>
             </div>

@@ -546,6 +546,7 @@ ALTER TABLE public.parametros ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE public.periodos (
     id integer NOT NULL,
     nombre text NOT NULL,
+    anio integer DEFAULT EXTRACT(year FROM (now() AT TIME ZONE 'America/Bogota'::text)) NOT NULL,
     activo boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     fecha_inicio timestamp with time zone,
@@ -885,11 +886,11 @@ ALTER TABLE ONLY public.parametros
 
 
 --
--- Name: periodos periodos_nombre_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: periodos periodos_nombre_anio_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.periodos
-    ADD CONSTRAINT periodos_nombre_key UNIQUE (nombre);
+    ADD CONSTRAINT periodos_nombre_anio_key UNIQUE (nombre, anio);
 
 
 --

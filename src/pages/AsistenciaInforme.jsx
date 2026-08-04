@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { etiquetaPeriodo, etiquetaPeriodoConEstado } from '../lib/periodos'
 
 function formatearFecha(fechaISO) {
   const [y, m, d] = fechaISO.split('-')
@@ -220,7 +221,7 @@ export default function AsistenciaInforme() {
     const a = informe.asign
     const sheetName = `${a.grupos?.grados?.nombre ?? ''} ${a.grupos?.letra ?? ''} ${a.materias?.nombre ?? ''}`.slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
-    XLSX.writeFile(wb, `Asistencia_${sheetName}_${periodo?.nombre ?? ''}.xlsx`)
+    XLSX.writeFile(wb, `Asistencia_${sheetName}_${etiquetaPeriodo(periodo)}.xlsx`)
   }
 
   if (cargando) return <Layout><p className="text-slate-500 text-sm">Cargando...</p></Layout>
@@ -246,7 +247,7 @@ export default function AsistenciaInforme() {
               <label className="text-xs font-semibold text-slate-600 block mb-1">Periodo</label>
               <select value={periodoId ?? ''} onChange={e => setPeriodoId(Number(e.target.value))}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                {periodos.map(p => <option key={p.id} value={p.id}>{p.nombre}{p.activo ? ' (activo)' : ''}</option>)}
+                {periodos.map(p => <option key={p.id} value={p.id}>{etiquetaPeriodoConEstado(p)}</option>)}
               </select>
             </div>
 

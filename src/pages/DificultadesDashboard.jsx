@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { etiquetaPeriodo } from '../lib/periodos'
 import { useNavigate } from 'react-router-dom'
 
 const iconProps = {
@@ -192,7 +193,7 @@ export default function DificultadesDashboard() {
 
         <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6">
           <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
-            {periodo.nombre}
+            {etiquetaPeriodo(periodo)}
           </p>
           {(periodo.fecha_inicio || periodo.fecha_limite) && (
             <p className="text-xs text-slate-500 mb-1">

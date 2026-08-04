@@ -5,6 +5,7 @@ import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { useConfiguracion } from '../context/ConfiguracionContext'
 import { supabase } from '../lib/supabase'
+import { etiquetaPeriodo, etiquetaPeriodoConEstado } from '../lib/periodos'
 
 const LETRAS = ['A', 'B', 'C']
 
@@ -308,7 +309,7 @@ export default function CalificacionesInforme() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, wsConsolidado, 'Consolidado')
     XLSX.utils.book_append_sheet(wb, wsDetallado, 'Detallado')
-    XLSX.writeFile(wb, `Calificaciones_${nombreHoja}_${periodo?.nombre ?? ''}.xlsx`.slice(0, 200))
+    XLSX.writeFile(wb, `Calificaciones_${nombreHoja}_${etiquetaPeriodo(periodo)}.xlsx`.slice(0, 200))
   }
 
   if (cargando) return <Layout><p className="text-slate-500 text-sm">Cargando...</p></Layout>
@@ -334,7 +335,7 @@ export default function CalificacionesInforme() {
               <label className="text-xs font-semibold text-slate-600 block mb-1">Periodo</label>
               <select value={periodoId ?? ''} onChange={e => setPeriodoId(Number(e.target.value))}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                {periodos.map(p => <option key={p.id} value={p.id}>{p.nombre}{p.activo ? ' (activo)' : ''}</option>)}
+                {periodos.map(p => <option key={p.id} value={p.id}>{etiquetaPeriodoConEstado(p)}</option>)}
               </select>
             </div>
 

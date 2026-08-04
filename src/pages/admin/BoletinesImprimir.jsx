@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { etiquetaPeriodo } from '../../lib/periodos'
 
 const COLUMNAS_GRILLA = 5
 
@@ -133,7 +134,7 @@ function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificu
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontSize: 10, fontWeight: 600, margin: 0, marginBottom: 2 }}>{nombreInstitucion}</p>
           <p style={{ fontWeight: 700, fontSize: 12, margin: 0 }}>
-            INFORME PARCIAL {periodo?.nombre?.toUpperCase() ?? '____________'} — {grado?.nombre?.toUpperCase()}
+            INFORME PARCIAL {etiquetaPeriodo(periodo).toUpperCase() || '____________'} — {grado?.nombre?.toUpperCase()}
           </p>
         </div>
         <div />

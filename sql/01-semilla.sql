@@ -8,17 +8,18 @@
 --   1. grados          (la escalera académica)
 --   2. grupos          (cada grado x sus letras)
 --   3. configuracion   (la fila única id=1 que la app asume que existe)
+--   4. parametros      (Saber/Hacer/Ser + pesos de sus subparámetros)
 --
 -- NO contiene estudiantes, docentes, materias, periodos ni notas.
 -- Esos los carga el admin del colegio desde la app (plantillas/*.xlsx).
 --
--- ⚠️ AJUSTAR ANTES DE EJECUTAR: ver los tres bloques marcados "AJUSTAR".
+-- ⚠️ AJUSTAR ANTES DE EJECUTAR: ver los cuatro bloques marcados "AJUSTAR".
 -- =====================================================================
 
 begin;
 
 -- ---------------------------------------------------------------------
--- 1. GRADOS                                          << AJUSTAR (1 de 3)
+-- 1. GRADOS                                          << AJUSTAR (1 de 4)
 -- ---------------------------------------------------------------------
 -- Borra las filas de los grados que este colegio NO tenga.
 -- Ejemplo: un colegio solo de primaria borra de '6°' a '11°'.
@@ -41,7 +42,7 @@ insert into public.grados (id, nombre, orden, nivel) values
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------
--- 2. GRUPOS                                          << AJUSTAR (2 de 3)
+-- 2. GRUPOS                                          << AJUSTAR (2 de 4)
 -- ---------------------------------------------------------------------
 -- Genera un grupo por cada grado x cada letra de la lista.
 -- Si el colegio maneja grupos A hasta E, cambia la lista por:
@@ -57,7 +58,7 @@ order by g.orden, l.letra
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------
--- 3. CONFIGURACIÓN                                   << AJUSTAR (3 de 3)
+-- 3. CONFIGURACIÓN                                   << AJUSTAR (3 de 4)
 -- ---------------------------------------------------------------------
 -- La app asume que SIEMPRE existe la fila id = 1. Si falta, falla.
 -- El nombre, el eslogan y el logo también se pueden cambiar después
@@ -77,11 +78,48 @@ values (
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------
--- 4. Sincronizar las secuencias
+-- 4. PARÁMETROS DE EVALUACIÓN                        << AJUSTAR (4 de 4)
+-- ---------------------------------------------------------------------
+-- Saber / Hacer / Ser y los pesos iniciales de sus subparámetros.
+-- Solo aplica si el colegio contrató el módulo de calificaciones.
+--
+-- POR QUÉ ESTÁ AQUÍ: sin estas filas, /admin/parametros no se puede
+-- usar. Muestra el cartel "Falta ejecutar el SQL" y no ofrece salida:
+-- esa pantalla solo hace UPDATE sobre filas que ya existen, nunca
+-- INSERT, así que el admin no puede crearlas desde la app.
+--
+-- Los porcentajes deben sumar EXACTAMENTE 100 — la pantalla se niega
+-- a guardar si no. Lo mismo los 4 pesos de cada parámetro.
+-- ---------------------------------------------------------------------
+insert into public.parametros (nombre, porcentaje, orden)
+select v.nombre, v.porcentaje, v.orden
+from (values
+  ('Saber', 40::numeric, 1),          -- << AJUSTAR
+  ('Hacer', 40::numeric, 2),          -- << AJUSTAR
+  ('Ser',   20::numeric, 3)           -- << AJUSTAR  (los tres suman 100)
+) as v(nombre, porcentaje, orden)
+where not exists (select 1 from public.parametros);
+
+-- 4 subparámetros por parámetro, al 25% cada uno.
+-- Va con INSERT ... SELECT y no con valores fijos porque parametros.id
+-- es `generated always as identity`: los ids los asigna Postgres en el
+-- INSERT de arriba y no se pueden escribir a mano aquí.
+insert into public.subparametro_plantilla (parametro_id, orden, peso)
+select p.id, o.orden, 25              -- << AJUSTAR el peso (los 4 suman 100)
+from public.parametros p
+cross join (values (1), (2), (3), (4)) as o(orden)
+on conflict (parametro_id, orden) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 5. Sincronizar las secuencias
 -- ---------------------------------------------------------------------
 -- Los ids de arriba se insertaron a mano. Sin esto, el primer INSERT
 -- que haga la app intentaría usar el id 1 y chocaría con una clave
 -- duplicada. NO borrar este bloque.
+--
+-- parametros y subparametro_plantilla NO aparecen aquí a propósito:
+-- son `identity` y nunca se les puso el id a mano, así que su secuencia
+-- ya quedó en el valor correcto.
 -- ---------------------------------------------------------------------
 select setval(pg_get_serial_sequence('public.grados', 'id'),
               coalesce((select max(id) from public.grados), 1), true);
@@ -97,12 +135,25 @@ commit;
 -- =====================================================================
 -- VERIFICACIÓN — correr después y revisar los resultados
 -- =====================================================================
--- Esperado en un colegio completo: 12 grados, 36 grupos, 1 configuración.
-select 'grados'       as tabla, count(*) as filas from public.grados
+-- Esperado en un colegio completo: 12 grados, 36 grupos, 1 configuración,
+-- 3 parámetros y 12 filas de plantilla (4 por parámetro).
+select 'grados'        as tabla, count(*) as filas from public.grados
 union all
-select 'grupos',       count(*) from public.grupos
+select 'grupos',        count(*) from public.grupos
 union all
-select 'configuracion', count(*) from public.configuracion;
+select 'configuracion', count(*) from public.configuracion
+union all
+select 'parametros',    count(*) from public.parametros
+union all
+select 'plantilla',     count(*) from public.subparametro_plantilla;
+
+-- Los porcentajes y pesos que quedaron. Los tres porcentajes deben dar
+-- 100, y los 4 pesos de cada parámetro también.
+select p.orden, p.nombre, p.porcentaje,
+       (select string_agg(s.peso::text, ' / ' order by s.orden)
+        from public.subparametro_plantilla s where s.parametro_id = p.id) as pesos
+from public.parametros p
+order by p.orden;
 
 -- Listado legible de los grupos creados, para revisar de un vistazo:
 select g.nombre as grado, string_agg(gr.letra, ', ' order by gr.letra) as grupos

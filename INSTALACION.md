@@ -14,7 +14,7 @@ Guion técnico para montar esta app en un colegio distinto. Arquitectura vigente
 | Ruta | Qué es | Estado |
 |---|---|---|
 | `sql/00-esquema-completo.sql` | Esquema completo: 17 tablas, 6 funciones, 1 trigger, 9 índices y **47 políticas RLS**. Sin datos. | ✅ |
-| `sql/01-semilla.sql` | Datos base: `grados`, `grupos`, fila `configuracion`. Parametrizable por colegio. | ✅ |
+| `sql/01-semilla.sql` | Datos base: `grados`, `grupos`, fila `configuracion`, `parametros` + `subparametro_plantilla`. Parametrizable por colegio. | ✅ |
 | `sql/02-storage.sql` | Bucket `logos` + sus 3 políticas (lectura pública, escritura solo admin) | ✅ |
 | `sql/2026-*.sql` | Migraciones históricas incrementales (referencia, ya incluidas en el esquema) | ✅ |
 | `supabase/functions/admin-docentes/` | Edge Function de gestión de cuentas | ⏳ falta `index.ts` |
@@ -74,7 +74,13 @@ PGPASSWORD='LA_CONTRASEÑA_DE_LA_BD' \
 1. **New project** → nombre `seguimiento-NOMBRECOLEGIO`, región **East US (North Virginia)**,
    guardar la contraseña generada.
 2. **SQL Editor** → pegar `sql/00-esquema-completo.sql` → **Run**.
-3. **SQL Editor** → ajustar `sql/01-semilla.sql` a los grados/grupos reales del colegio → **Run**.
+3. **SQL Editor** → ajustar `sql/01-semilla.sql` a los datos reales del colegio → **Run**.
+   Son **cuatro** bloques marcados `<< AJUSTAR`: grados, grupos, configuración y los
+   **porcentajes de Saber / Hacer / Ser** con los pesos de sus subparámetros.
+   ⚠️ El bloque 4 no es opcional si el colegio usa calificaciones: sin esas filas,
+   `/admin/parametros` solo muestra *"Falta ejecutar el SQL"* y **no hay forma de crearlas
+   desde la app** (esa pantalla solo edita filas que ya existen). Los tres porcentajes deben
+   sumar 100, y los 4 pesos de cada parámetro también, o la pantalla se niega a guardar.
 4. **Authentication → Policies**: verificar que **ninguna** tabla diga *"RLS is not enabled"*.
 5. **Edge Functions** → crear `admin-docentes` (ver su README) → **Deploy**.
 6. **SQL Editor** → pegar `sql/02-storage.sql` → **Run**. Crea el bucket `logos` y sus políticas.

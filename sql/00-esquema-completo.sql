@@ -1032,7 +1032,7 @@ ALTER TABLE ONLY public.asignaciones
 --
 
 ALTER TABLE ONLY public.asignaciones
-    ADD CONSTRAINT asignaciones_grupo_id_fkey FOREIGN KEY (grupo_id) REFERENCES public.grupos(id) ON DELETE CASCADE;
+    ADD CONSTRAINT asignaciones_grupo_id_fkey FOREIGN KEY (grupo_id) REFERENCES public.grupos(id) ON DELETE RESTRICT;
 
 
 --
@@ -1040,7 +1040,7 @@ ALTER TABLE ONLY public.asignaciones
 --
 
 ALTER TABLE ONLY public.asignaciones
-    ADD CONSTRAINT asignaciones_materia_id_fkey FOREIGN KEY (materia_id) REFERENCES public.materias(id) ON DELETE CASCADE;
+    ADD CONSTRAINT asignaciones_materia_id_fkey FOREIGN KEY (materia_id) REFERENCES public.materias(id) ON DELETE RESTRICT;
 
 
 --
@@ -1064,7 +1064,7 @@ ALTER TABLE ONLY public.asistencias
 --
 
 ALTER TABLE ONLY public.asistencias
-    ADD CONSTRAINT asistencias_periodo_id_fkey FOREIGN KEY (periodo_id) REFERENCES public.periodos(id) ON DELETE CASCADE;
+    ADD CONSTRAINT asistencias_periodo_id_fkey FOREIGN KEY (periodo_id) REFERENCES public.periodos(id) ON DELETE RESTRICT;
 
 
 --
@@ -1096,7 +1096,7 @@ ALTER TABLE ONLY public.docentes
 --
 
 ALTER TABLE ONLY public.estudiantes
-    ADD CONSTRAINT estudiantes_grupo_id_fkey FOREIGN KEY (grupo_id) REFERENCES public.grupos(id) ON DELETE CASCADE;
+    ADD CONSTRAINT estudiantes_grupo_id_fkey FOREIGN KEY (grupo_id) REFERENCES public.grupos(id) ON DELETE RESTRICT;
 
 
 --
@@ -1104,7 +1104,7 @@ ALTER TABLE ONLY public.estudiantes
 --
 
 ALTER TABLE ONLY public.grupos
-    ADD CONSTRAINT grupos_grado_id_fkey FOREIGN KEY (grado_id) REFERENCES public.grados(id) ON DELETE CASCADE;
+    ADD CONSTRAINT grupos_grado_id_fkey FOREIGN KEY (grado_id) REFERENCES public.grados(id) ON DELETE RESTRICT;
 
 
 --
@@ -1144,7 +1144,7 @@ ALTER TABLE ONLY public.marcas
 --
 
 ALTER TABLE ONLY public.marcas
-    ADD CONSTRAINT marcas_materia_id_fkey FOREIGN KEY (materia_id) REFERENCES public.materias(id) ON DELETE CASCADE;
+    ADD CONSTRAINT marcas_materia_id_fkey FOREIGN KEY (materia_id) REFERENCES public.materias(id) ON DELETE RESTRICT;
 
 
 --
@@ -1152,7 +1152,7 @@ ALTER TABLE ONLY public.marcas
 --
 
 ALTER TABLE ONLY public.marcas
-    ADD CONSTRAINT marcas_periodo_id_fkey FOREIGN KEY (periodo_id) REFERENCES public.periodos(id) ON DELETE CASCADE;
+    ADD CONSTRAINT marcas_periodo_id_fkey FOREIGN KEY (periodo_id) REFERENCES public.periodos(id) ON DELETE RESTRICT;
 
 
 --
@@ -1160,7 +1160,7 @@ ALTER TABLE ONLY public.marcas
 --
 
 ALTER TABLE ONLY public.materias
-    ADD CONSTRAINT materias_grado_id_fkey FOREIGN KEY (grado_id) REFERENCES public.grados(id) ON DELETE CASCADE;
+    ADD CONSTRAINT materias_grado_id_fkey FOREIGN KEY (grado_id) REFERENCES public.grados(id) ON DELETE RESTRICT;
 
 
 --
@@ -1184,7 +1184,7 @@ ALTER TABLE ONLY public.notas
 --
 
 ALTER TABLE ONLY public.notas
-    ADD CONSTRAINT notas_periodo_id_fkey FOREIGN KEY (periodo_id) REFERENCES public.periodos(id) ON DELETE CASCADE;
+    ADD CONSTRAINT notas_periodo_id_fkey FOREIGN KEY (periodo_id) REFERENCES public.periodos(id) ON DELETE RESTRICT;
 
 
 --

@@ -65,6 +65,15 @@ PGPASSWORD='LA_CONTRASEÑA_DE_LA_BD' \
 > Repite este dump **cada vez que cambies el esquema en producción**, o el kit queda desfasado
 > y el próximo colegio nacerá con una base de datos incompleta.
 
+> ⚠️ **El dump refleja producción, no lo que quieres que sea producción.** Si regeneras el
+> archivo mientras una migración pendiente (p. ej. `sql/2026-08-04_fk-restrict.sql`) todavía
+> no se ha corrido allá, el dump **revierte** ese cambio en el kit sin avisar. Corre la
+> migración en producción **antes** de volver a dumpear. Comprobación rápida tras cada dump:
+>
+> ```bash
+> grep -c "ON DELETE RESTRICT" sql/00-esquema-completo.sql   # debe dar 9 o más, nunca 0
+> ```
+
 ---
 
 ## Pasos en el colegio nuevo

@@ -10,6 +10,8 @@ export default function MateriasAdmin() {
   const [textoMasivo, setTextoMasivo] = useState('')
   const [cargando, setCargando] = useState(true)
   const [mensaje, setMensaje] = useState('')
+  const [editandoId, setEditandoId] = useState(null)
+  const [nombreEditado, setNombreEditado] = useState('')
   const fileRef = useRef(null)
 
   const cargarGrados = async () => {
@@ -29,7 +31,11 @@ export default function MateriasAdmin() {
   }
 
   useEffect(() => { cargarGrados().then(() => setCargando(false)) }, [])
-  useEffect(() => { cargarMaterias(gradoId) }, [gradoId])
+  useEffect(() => {
+    setEditandoId(null)
+    setNombreEditado('')
+    cargarMaterias(gradoId)
+  }, [gradoId])
 
   const agregarMateria = async () => {
     const nombre = nuevaMateria.trim()
@@ -46,8 +52,48 @@ export default function MateriasAdmin() {
     cargarMaterias(gradoId)
   }
 
+  const iniciarEdicion = (m) => {
+    setEditandoId(m.id)
+    setNombreEditado(m.nombre)
+    setMensaje('')
+  }
+
+  const cancelarEdicion = () => {
+    setEditandoId(null)
+    setNombreEditado('')
+  }
+
+  const guardarEdicion = async (id) => {
+    const nombre = nombreEditado.trim()
+    if (!nombre) {
+      setMensaje('El nombre de la materia no puede quedar vacío.')
+      return
+    }
+    const { error } = await supabase.from('materias').update({ nombre }).eq('id', id)
+    if (error) {
+      setMensaje(
+        error.code === '23505'
+          ? 'Ya existe una materia con ese nombre en este grado.'
+          : 'Error al renombrar: ' + error.message
+      )
+      return
+    }
+    cancelarEdicion()
+    setMensaje('')
+    cargarMaterias(gradoId)
+  }
+
   const eliminarMateria = async (id) => {
-    await supabase.from('materias').delete().eq('id', id)
+    const { error } = await supabase.from('materias').delete().eq('id', id)
+    if (error) {
+      setMensaje(
+        error.code === '23503'
+          ? 'No se puede eliminar: esta materia tiene docentes asignados o registros asociados. Renómbrala si solo quieres corregir el nombre.'
+          : 'Error al eliminar: ' + error.message
+      )
+      return
+    }
+    setMensaje('')
     cargarMaterias(gradoId)
   }
 
@@ -152,10 +198,32 @@ export default function MateriasAdmin() {
                   key={m.id}
                   className="inline-flex items-center gap-2 bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-full"
                 >
-                  {m.nombre}
-                  <button onClick={() => eliminarMateria(m.id)} className="text-red-500 hover:text-red-700">
-                    ×
-                  </button>
+                  {editandoId === m.id ? (
+                    <input
+                      value={nombreEditado}
+                      onChange={e => setNombreEditado(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') guardarEdicion(m.id)
+                        if (e.key === 'Escape') cancelarEdicion()
+                      }}
+                      autoFocus
+                      className="bg-white border border-slate-300 rounded-full px-2 py-0.5 text-xs font-semibold w-40"
+                    />
+                  ) : (
+                    <>
+                      {m.nombre}
+                      <button
+                        onClick={() => iniciarEdicion(m)}
+                        title="Renombrar"
+                        className="text-slate-400 hover:text-emerald-700"
+                      >
+                        ✎
+                      </button>
+                      <button onClick={() => eliminarMateria(m.id)} className="text-red-500 hover:text-red-700">
+                        ×
+                      </button>
+                    </>
+                  )}
                 </span>
               ))}
               {materias.length === 0 && (

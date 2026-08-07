@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase'
 const secciones = [
   { to: '/admin', label: 'Ajustes institución', end: true, permiso: 'configurar_institucion' },
   { to: '/admin/periodos', label: 'Periodos', permiso: 'gestionar_periodos' },
+  { to: '/admin/estructura', label: 'Grados y grupos', soloAdmin: true },
   { to: '/admin/materias', label: 'Materias por grado', soloAdmin: true },
   { to: '/admin/estudiantes', label: 'Estudiantes', soloAdmin: true },
   { to: '/admin/docentes', label: 'Docentes', soloAdmin: true },

@@ -76,7 +76,7 @@ export default function AsistenciaDashboard() {
       const { data: asignData } = await supabase
         .from('asignaciones')
         .select(`id, grupo_id, materia_id,
-          grupos(letra, grados(nombre)),
+          grupos(nombre, grados(nombre)),
           materias(nombre)`)
         .eq('docente_id', docente.id)
       setAsignaciones(asignData || [])
@@ -351,7 +351,7 @@ export default function AsistenciaDashboard() {
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full">
                 {asignaciones.map((a, i) => (
                   <option key={a.id} value={i}>
-                    {a.grupos.grados.nombre} {a.grupos.letra} — {a.materias.nombre}
+                    {a.grupos.grados.nombre} {a.grupos.nombre} — {a.materias.nombre}
                   </option>
                 ))}
               </select>
@@ -362,7 +362,7 @@ export default function AsistenciaDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-bold text-slate-800">
-                  {asign.grupos.grados.nombre} {asign.grupos.letra} · {asign.materias.nombre}
+                  {asign.grupos.grados.nombre} {asign.grupos.nombre} · {asign.materias.nombre}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">{formatearFecha(fecha)}</div>
               </div>

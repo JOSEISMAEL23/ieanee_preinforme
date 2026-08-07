@@ -64,7 +64,7 @@ export default function DificultadesDashboard() {
         .from('asignaciones')
         .select(`
           id, grupo_id, materia_id,
-          grupos ( letra, grados ( nombre ) ),
+          grupos ( nombre, grados ( nombre ) ),
           materias ( nombre )
         `)
         .eq('docente_id', docente.id)
@@ -221,7 +221,7 @@ export default function DificultadesDashboard() {
               >
                 {asignaciones.map((a, i) => (
                   <option key={a.id} value={i}>
-                    {a.grupos.grados.nombre} {a.grupos.letra} — {a.materias.nombre}
+                    {a.grupos.grados.nombre} {a.grupos.nombre} — {a.materias.nombre}
                   </option>
                 ))}
               </select>
@@ -229,7 +229,7 @@ export default function DificultadesDashboard() {
           )}
 
           <div className="text-lg font-bold text-slate-800 mb-4">
-            {asign.grupos.grados.nombre} {asign.grupos.letra} · {asign.materias.nombre}
+            {asign.grupos.grados.nombre} {asign.grupos.nombre} · {asign.materias.nombre}
           </div>
 
           {/* Resumen compacto con insignias */}

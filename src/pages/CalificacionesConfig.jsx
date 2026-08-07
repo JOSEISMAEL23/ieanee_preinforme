@@ -56,7 +56,7 @@ export default function CalificacionesConfig() {
         supabase
           .from('asignaciones')
           .select(`id, grupo_id, materia_id,
-            grupos(letra, grados(nombre)),
+            grupos(nombre, grados(nombre)),
             materias(nombre)`)
           .eq('docente_id', docente.id),
         supabase.from('parametros').select('*').order('orden'),
@@ -252,7 +252,7 @@ export default function CalificacionesConfig() {
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-full">
                 {asignaciones.map((a, i) => (
                   <option key={a.id} value={i}>
-                    {a.grupos.grados.nombre} {a.grupos.letra} — {a.materias.nombre}
+                    {a.grupos.grados.nombre} {a.grupos.nombre} — {a.materias.nombre}
                   </option>
                 ))}
               </select>
@@ -261,7 +261,7 @@ export default function CalificacionesConfig() {
 
           {asign && (
             <div className="font-bold text-slate-800">
-              {asign.grupos.grados.nombre} {asign.grupos.letra} · {asign.materias.nombre}
+              {asign.grupos.grados.nombre} {asign.grupos.nombre} · {asign.materias.nombre}
             </div>
           )}
 

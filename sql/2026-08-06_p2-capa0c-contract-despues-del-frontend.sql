@@ -53,11 +53,12 @@ alter table public.grupos alter column orden  set not null;
 commit;
 
 
--- NOTA: el `drop column letra` se lleva por delante, en cascada implícita, la
--- constraint grupos_grado_id_letra_key UNIQUE (grado_id, letra) que hay hoy en
--- el esquema. Es lo que se busca — ver el HALLAZGO del archivo de la fase 1
--- (2026-08-06_p2-capa0a-expand.sql): mientras ese UNIQUE viva, dos grupos del
--- mismo grado no pueden empezar por el mismo carácter. A partir de aquí, sí.
+-- NOTA: la constraint grupos_grado_id_letra_key UNIQUE (grado_id, letra) que
+-- hay hoy en el esquema NO se cae aquí — ya la quitó el paso 1b de la fase 1,
+-- porque esperar hasta este archivo habría dejado la fase 2 rompiéndose en
+-- producción con 23505 al crear "1-01" y "1-02". Ver el HALLAZGO de
+-- 2026-08-06_p2-capa0a-expand.sql. Si al llegar aquí esa constraint todavía
+-- existe, la fase 1 se corrió incompleta: revisar antes de seguir.
 
 
 -- ============================================================================

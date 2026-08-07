@@ -5,9 +5,13 @@
 -- ============================================================================
 --
 -- QUÉ HACE
---   Añade `nombre` y `orden` a `grupos`, quita el CHECK que prohíbe existir a
---   los grupos D en adelante, y monta un trigger que mantiene `letra` y
---   `nombre` sincronizadas mientras conviven.
+--   Añade `nombre` y `orden` a `grupos`, quita las DOS constraints que atan la
+--   tabla a la letra (el CHECK A/B/C y el UNIQUE sobre (grado_id, letra)), y
+--   monta un trigger que mantiene `letra` y `nombre` sincronizadas mientras
+--   conviven.
+--
+--   Única diferencia con la spec §3.1: el paso 1b, que quita ese UNIQUE. El
+--   porqué está en el HALLAZGO del final del archivo.
 --
 -- POR QUÉ ASÍ Y NO RENOMBRANDO DE GOLPE
 --   Renombrar `letra -> nombre` exige que la base y el frontend cambien en el
@@ -50,10 +54,16 @@ having count(*) > 1;
 
 begin;
 
--- 1. Fuera la ley que prohíbe existir a los grupos D en adelante.
---    Se puede hacer ya: quitar un CHECK nunca rompe al código viejo,
---    solo deja de prohibir algo que el código viejo no intentaba hacer.
+-- 1a. Fuera la ley que prohíbe existir a los grupos D en adelante.
+--     Se puede hacer ya: quitar un CHECK nunca rompe al código viejo,
+--     solo deja de prohibir algo que el código viejo no intentaba hacer.
 alter table public.grupos drop constraint grupos_letra_check;
+
+-- 1b. Y fuera el UNIQUE sobre (grado_id, letra), por el mismo motivo.
+--     Si se queda, en la fase 2 el trigger deriva letra = left(nombre,1)
+--     y dos grupos del mismo grado no pueden empezar por el mismo carácter:
+--     "1-01" y "1-02" chocan con 23505. Ver el HALLAZGO al final.
+alter table public.grupos drop constraint grupos_grado_id_letra_key;
 
 -- 2. Las columnas nuevas nacen NULLABLE. Obligatorio en un expand:
 --    el codigo viejo hace insert sin ellas y no puede fallar.
@@ -121,11 +131,20 @@ commit;
 -- order by ordinal_position;
 -- -- esperado: id, grado_id, letra (NO), nombre (text, YES), orden (integer, YES)
 --
--- -- b) No quedó ni rastro del CHECK
+-- -- b) No quedó ni rastro de las dos constraints sobre `letra`
 -- select conname from pg_constraint where conrelid='public.grupos'::regclass;
--- -- esperado: pkey, grado_id_fkey, grupos_grado_id_nombre_key. NADA de letra_check
--- -- OJO: sale también grupos_grado_id_letra_key, que la spec §2 no lista.
--- --      Ver el HALLAZGO al final de este archivo. No es un fallo de la migración.
+-- -- esperado: EXACTAMENTE estas tres, ni una más:
+-- --     grupos_pkey
+-- --     grupos_grado_id_fkey
+-- --     grupos_grado_id_nombre_key
+-- --
+-- -- Si aparece grupos_letra_check      -> el paso 1a no se aplicó.
+-- -- Si aparece grupos_grado_id_letra_key -> PARAR. El paso 1b no se aplicó.
+-- --     Cuidado, porque esto NO se nota aquí: el resto de la fase 1 pasa
+-- --     igual, las 36 filas quedan bien y hasta los pasos d..h dan verde.
+-- --     Estalla en la FASE 2, en producción, al crear el segundo grupo que
+-- --     empiece por el mismo carácter ("1-01" y luego "1-02"): 23505.
+-- --     No seguir a la fase 2 hasta que esta consulta dé las tres de arriba.
 --
 -- -- c) Las 36 filas siguen ahí, con nombre = letra y orden 1,2,3 por grado
 -- select g.nombre as grado, gr.letra, gr.nombre as grupo, gr.orden
@@ -164,21 +183,25 @@ commit;
 
 
 -- ============================================================================
--- ⚠️ HALLAZGO AL ESCRIBIR ESTE ARCHIVO — leer antes de la fase 2
+-- ⚠️ HALLAZGO — RESUELTO. Registro de la decisión.
 -- ============================================================================
 --
--- El bloque de arriba está copiado TAL CUAL de la spec §3.1, sin cambios.
--- Pero al contrastarlo con sql/00-esquema-completo.sql aparece una constraint
--- que la spec §2 ("estado actual verificado") NO lista:
+-- ESTADO: aplicado el 2026-08-06. Es el paso 1b del bloque de arriba.
+--         Este texto se conserva como registro del porqué, no como pendiente.
+--
+-- El bloque de arriba salió copiado TAL CUAL de la spec §3.1. Al contrastarlo
+-- con sql/00-esquema-completo.sql apareció una constraint que la spec §2
+-- ("estado actual verificado") NO lista:
 --
 --     ALTER TABLE ONLY public.grupos
 --       ADD CONSTRAINT grupos_grado_id_letra_key UNIQUE (grado_id, letra);
 --                                                        ^^^^^^^^^^^^^^^
 --
--- Esta fase 1 NO la toca, y no pasa nada: con 36 filas A/B/C por grado se
--- cumple de sobra, y los pasos d..h la satisfacen. La fase 1 es segura.
+-- Dejarla no rompía la fase 1: con 36 filas A/B/C por grado se cumple de
+-- sobra, y los pasos d..h la satisfacen. Por eso es traicionera — la fase 1
+-- da verde igual.
 --
--- EL PROBLEMA APARECE EN LA FASE 2, cuando el frontend escriba solo `nombre`
+-- EL PROBLEMA APARECÍA EN LA FASE 2, cuando el frontend escriba solo `nombre`
 -- y el trigger derive letra := left(nombre, 1):
 --
 --     grupo "1-01" -> letra '1'
@@ -187,31 +210,40 @@ commit;
 --     grupo "Mañana" -> letra 'M'
 --     grupo "Martes" -> letra 'M' -> 23505
 --
--- Es decir: mientras exista ese UNIQUE, dos grupos del mismo grado no pueden
--- empezar por el mismo carácter. Justo el caso "1-01 / 1-02" que la spec §1
--- pone como ejemplo de lo que hay que desbloquear. Sin resolverlo, la fase 2
--- entrega el nombre libre a medias y el fallo sale en producción, al crear el
--- segundo grupo.
+-- Es decir: mientras existiera ese UNIQUE, dos grupos del mismo grado no
+-- podían empezar por el mismo carácter. Justo el caso "1-01 / 1-02" que la
+-- spec §1 pone como ejemplo de lo que hay que desbloquear. Sin resolverlo, la
+-- fase 2 entregaba el nombre libre a medias y el fallo salía en producción, al
+-- crear el segundo grupo.
 --
--- Se cura solo en la fase 3: al hacer `drop column letra`, Postgres se lleva
+-- Se curaba solo en la fase 3: al hacer `drop column letra`, Postgres se lleva
 -- por delante la constraint que depende de esa columna. Pero eso son DÍAS
 -- después, y la ventana de convivencia es justo cuando el frontend nuevo ya
--- está creando grupos.
+-- está creando grupos. Esperar a la fase 3 no servía.
 --
--- OPCIONES (decisión tuya, NO la tomo yo, por eso va comentado):
+-- LAS TRES OPCIONES QUE HABÍA:
 --
---   A) Añadir esta línea al bloque de la fase 1, dentro del begin/commit.
---      Quitar un UNIQUE es tan retrocompatible como quitar el CHECK del paso 1:
---      el código viejo no crea duplicados, así que no lo echa de menos.
+--   A) ✅ ELEGIDA (2026-08-06). Quitar el UNIQUE dentro del begin/commit de
+--      la fase 1 — es el paso 1b de arriba.
 --
 --          alter table public.grupos drop constraint grupos_grado_id_letra_key;
 --
---   B) Dejarlo y correrlo como migración aparte justo antes de la fase 2.
+--      POR QUÉ: quitar un UNIQUE es tan retrocompatible como quitar el CHECK
+--      del paso 1a. El código viejo nunca creó duplicados de (grado_id, letra),
+--      así que no echa de menos una constraint que jamás llegó a tocar. Cabe
+--      en la misma transacción, es una línea, y deja la fase 2 sin sorpresas.
+--      Lo que protege de verdad los nombres a partir de ahora es el UNIQUE
+--      (grado_id, nombre) del paso 6, que es el correcto.
 --
---   C) Cambiar el trigger para que derive una letra única en vez de
---      left(nombre,1). Es la más frágil: más código en un puente temporal.
+--   B) Descartada: correrlo como migración aparte justo antes de la fase 2.
+--      Añade un cuarto momento que hay que acordarse de ejecutar, y si se
+--      olvida el síntoma es un 23505 en producción. Mismo efecto que A, más
+--      superficie para el olvido.
 --
--- Recomendación: A. Es una línea, cabe en esta misma transacción, y deja la
--- fase 2 sin sorpresas. Pero la spec dice "tal cual", así que va aquí abajo
--- y no arriba. Si eliges A, muévela al paso 1 y vuelve a correr en staging.
+--   C) Descartada: cambiar el trigger para derivar una letra única en vez de
+--      left(nombre,1). La más frágil de las tres: mete lógica no trivial en un
+--      puente que existe para morir en unos días, y habría que probarla.
+--
+-- Lo que NO cambia: la única diferencia con la spec §3.1 es el paso 1b. El
+-- resto del bloque sigue tal cual.
 -- ============================================================================

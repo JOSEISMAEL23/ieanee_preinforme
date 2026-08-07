@@ -2,11 +2,9 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 
-const LETRAS = ['A', 'B', 'C']
-
 const SELECT_INCAPACIDAD = `
   id, estudiante_id, fecha_inicio, fecha_fin, motivo, created_at,
-  estudiantes(nombre, grupo_id, grupos(letra, grados(nombre)))
+  estudiantes(nombre, grupo_id, grupos(nombre, grados(nombre)))
 `
 
 function hoy() {
@@ -28,7 +26,7 @@ function diasRango(inicio, fin) {
 
 function nombreGrupo(est) {
   if (!est?.grupos) return ''
-  return `${est.grupos.grados?.nombre ?? ''} ${est.grupos.letra ?? ''}`.trim()
+  return `${est.grupos.grados?.nombre ?? ''} ${est.grupos.nombre ?? ''}`.trim()
 }
 
 export default function IncapacidadesAdmin() {
@@ -36,7 +34,8 @@ export default function IncapacidadesAdmin() {
 
   const [grados, setGrados]           = useState([])
   const [gradoId, setGradoId]         = useState(null)
-  const [letra, setLetra]             = useState('A')
+  const [grupos, setGrupos]           = useState([])
+  const [nombre, setNombre]           = useState(null)
   const [estudiantes, setEstudiantes] = useState([])
 
   // Formulario de creación
@@ -82,19 +81,30 @@ export default function IncapacidadesAdmin() {
     })()
   }, [])
 
-  // Al cambiar grado o letra, recargar los estudiantes de ese grupo
+  // Los grupos del grado, en su orden. Antes esta lista era una constante fija
+  // con A, B y C escrita a mano.
   useEffect(() => {
-    if (!gradoId) return
+    if (!gradoId) { setGrupos([]); return }
     ;(async () => {
-      const { data: grupo } = await supabase
-        .from('grupos').select('id').eq('grado_id', gradoId).eq('letra', letra).single()
-      if (!grupo) { setEstudiantes([]); setEstudianteId(''); return }
+      const { data } = await supabase
+        .from('grupos').select('id, nombre').eq('grado_id', gradoId).order('orden')
+      const lista = data || []
+      setGrupos(lista)
+      setNombre(prev => lista.some(g => g.nombre === prev) ? prev : (lista[0]?.nombre ?? null))
+    })()
+  }, [gradoId])
+
+  // Al cambiar de grupo, recargar los estudiantes de ese grupo
+  useEffect(() => {
+    const grupo = grupos.find(g => g.nombre === nombre)
+    if (!grupo) { setEstudiantes([]); setEstudianteId(''); return }
+    ;(async () => {
       const { data } = await supabase
         .from('estudiantes').select('id, nombre').eq('grupo_id', grupo.id).order('nombre')
       setEstudiantes(data || [])
       setEstudianteId('')
     })()
-  }, [gradoId, letra])
+  }, [grupos, nombre])
 
   const crearIncapacidad = async () => {
     setMensaje('')
@@ -152,9 +162,9 @@ export default function IncapacidadesAdmin() {
   }
 
   const eliminarIncapacidad = async (inc) => {
-    const nombre = inc.estudiantes?.nombre ?? 'este estudiante'
+    const nombreEst = inc.estudiantes?.nombre ?? 'este estudiante'
     const ok = window.confirm(
-      `¿Eliminar la incapacidad de ${nombre} ` +
+      `¿Eliminar la incapacidad de ${nombreEst} ` +
       `(${formatearFecha(inc.fecha_inicio)} — ${formatearFecha(inc.fecha_fin)})?`
     )
     if (!ok) return
@@ -167,14 +177,14 @@ export default function IncapacidadesAdmin() {
   if (cargando) return <p className="text-slate-500 text-sm">Cargando...</p>
 
   const gradoActual = grados.find(g => g.id === gradoId)
-  const etiquetaGrupo = `${gradoActual?.nombre ?? ''} ${letra}`.trim()
+  const etiquetaGrupo = `${gradoActual?.nombre ?? ''} ${nombre ?? ''}`.trim()
 
   const visibles = incapacidades.filter(inc => {
     const est = inc.estudiantes
     if (soloEsteGrupo) {
       const coincide =
         est?.grupos?.grados?.nombre === gradoActual?.nombre &&
-        est?.grupos?.letra === letra
+        est?.grupos?.nombre === nombre
       if (!coincide) return false
     }
     const texto = busqueda.trim().toLowerCase()
@@ -211,17 +221,17 @@ export default function IncapacidadesAdmin() {
 
           <div className="flex-1 min-w-0 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              {LETRAS.map(l => (
+              {grupos.map(gr => (
                 <button
-                  key={l}
-                  onClick={() => setLetra(l)}
+                  key={gr.id}
+                  onClick={() => setNombre(gr.nombre)}
                   className={`w-10 h-10 rounded-lg text-sm font-bold border ${
-                    letra === l
+                    nombre === gr.nombre
                       ? 'bg-emerald-800 text-white border-emerald-800'
                       : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-700'
                   }`}
                 >
-                  {l}
+                  {gr.nombre}
                 </button>
               ))}
               <span className="text-sm text-slate-500 ml-2">

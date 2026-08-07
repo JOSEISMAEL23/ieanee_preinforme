@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 
-const LETRAS = ['A', 'B', 'C']
-
 const MAPA_GRADOS_PALABRA = {
   transicion: 'transicion',
   primero: '1',
@@ -50,7 +48,7 @@ function generarEmailSintetico(nombre, yaUsados) {
 export default function DocentesAdmin() {
   const [grados, setGrados] = useState([])
   const [materiasByGrado, setMateriasByGrado] = useState({})
-  const [grupos, setGrupos] = useState([]) // {id, letra, grado_id}
+  const [grupos, setGrupos] = useState([]) // {id, nombre, orden, grado_id}, ya ordenados
   const [docentes, setDocentes] = useState(null)
   const [expandido, setExpandido] = useState(null)
   const [editandoId, setEditandoId] = useState(null)
@@ -65,14 +63,14 @@ export default function DocentesAdmin() {
   // Estado para el mini-formulario de agregar asignación a un docente existente
   const [agregandoAsignId, setAgregandoAsignId] = useState(null) // id del docente al que se le agrega
   const [asignGradoId,  setAsignGradoId]  = useState(null)
-  const [asignLetras,   setAsignLetras]   = useState([])
+  const [asignNombres,  setAsignNombres]  = useState([])
   const [asignMateriaId, setAsignMateriaId] = useState('')
   const [guardandoAsign, setGuardandoAsign] = useState(false)
 
   const cargarCatalogos = async () => {
     const { data: gradosData } = await supabase.from('grados').select('*').order('orden')
     const { data: materiasData } = await supabase.from('materias').select('*').order('orden')
-    const { data: gruposData } = await supabase.from('grupos').select('*')
+    const { data: gruposData } = await supabase.from('grupos').select('*').order('orden')
 
     setGrados(gradosData || [])
     setGrupos(gruposData || [])
@@ -93,7 +91,7 @@ export default function DocentesAdmin() {
         id, user_id, nombre, email, rol, cargo,
         asignaciones ( id, materia_id, grupo_id,
           materias ( nombre ),
-          grupos ( letra, grados ( nombre ) )
+          grupos ( nombre, grados ( nombre ) )
         )
       `)
       .eq('rol', 'docente')
@@ -189,22 +187,22 @@ export default function DocentesAdmin() {
   const abrirAgregarAsignacion = (docenteId) => {
     setAgregandoAsignId(docenteId)
     setAsignGradoId(grados[0]?.id ?? null)
-    setAsignLetras([])
+    setAsignNombres([])
     setAsignMateriaId('')
   }
 
-  const toggleAsignLetra = (l) => {
-    setAsignLetras(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
+  const toggleAsignNombre = (n) => {
+    setAsignNombres(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n])
   }
 
   const guardarNuevaAsignacion = async (docente) => {
-    if (!asignGradoId || asignLetras.length === 0 || !asignMateriaId) return
+    if (!asignGradoId || asignNombres.length === 0 || !asignMateriaId) return
     setGuardandoAsign(true)
     setMensaje('')
 
-    // Construir filas a insertar (una por letra seleccionada)
-    const nuevas = asignLetras.map(l => {
-      const grupo = grupos.find(g => g.grado_id === asignGradoId && g.letra === l)
+    // Construir filas a insertar (una por grupo seleccionado)
+    const nuevas = asignNombres.map(n => {
+      const grupo = grupos.find(g => g.grado_id === asignGradoId && g.nombre === n)
       return grupo ? { docente_id: docente.id, grupo_id: grupo.id, materia_id: Number(asignMateriaId) } : null
     }).filter(Boolean)
 
@@ -250,7 +248,11 @@ export default function DocentesAdmin() {
     const mapaGrados = {}
     grados.forEach(g => { mapaGrados[claveCanonica(g.nombre)] = g })
     const mapaGrupos = {}
-    grupos.forEach(g => { mapaGrupos[`${g.grado_id}_${g.letra.toUpperCase()}`] = g.id })
+    const nombresGrupo = new Set()
+    grupos.forEach(g => {
+      mapaGrupos[`${g.grado_id}_${normaliza(g.nombre)}`] = g.id
+      nombresGrupo.add(normaliza(g.nombre))
+    })
     const mapaMaterias = {}
     Object.entries(materiasByGrado).forEach(([gradoId, lista]) => {
       lista.forEach(m => { mapaMaterias[`${gradoId}_${normaliza(m.nombre)}`] = m.id })
@@ -271,14 +273,24 @@ export default function DocentesAdmin() {
 
       if (!nombre || !grupoTexto || !materiaTexto) { filasInvalidas++; return }
 
-      const letra = grupoTexto.slice(-1).toUpperCase()
-      if (!LETRAS.includes(letra)) { filasInvalidas++; return }
-      const gradoTexto = grupoTexto.slice(0, -1).trim()
-      const grado = mapaGrados[claveCanonica(gradoTexto)]
-      if (!grado) { filasInvalidas++; return }
-      const grupoId = mapaGrupos[`${grado.id}_${letra}`]
+      // Separar "6A" en grado + grupo. Antes se daba por hecho que el grupo era
+      // el ultimo caracter del texto y que estaba en la lista fija A/B/C. Ahora
+      // se prueba cada corte del texto contra los grupos que existen de verdad,
+      // del sufijo mas corto al mas largo.
+      let grado = null
+      let grupoId = null
+      for (let i = grupoTexto.length - 1; i >= 1; i--) {
+        const nombreGrupo = normaliza(grupoTexto.slice(i))
+        if (!nombresGrupo.has(nombreGrupo)) continue
+        const g = mapaGrados[claveCanonica(grupoTexto.slice(0, i).trim())]
+        if (!g) continue
+        const id = mapaGrupos[`${g.id}_${nombreGrupo}`]
+        if (id) { grado = g; grupoId = id; break }
+      }
+      if (!grupoId) { filasInvalidas++; return }
+
       const materiaId = mapaMaterias[`${grado.id}_${normaliza(materiaTexto)}`]
-      if (!grupoId || !materiaId) { filasInvalidas++; return }
+      if (!materiaId) { filasInvalidas++; return }
 
       if (!porNombre[nombre]) {
         porNombre[nombre] = { nombre, email: emailCol || null, password: passwordCol || null, asignaciones: [] }
@@ -411,7 +423,7 @@ export default function DocentesAdmin() {
                     ) : null}
                     {d.asignaciones.map(a => (
                       <div key={a.id} className="flex items-center justify-between text-sm text-slate-700">
-                        <span>{a.grupos.grados.nombre} {a.grupos.letra} — {a.materias.nombre}</span>
+                        <span>{a.grupos.grados.nombre} {a.grupos.nombre} — {a.materias.nombre}</span>
                         <button
                           onClick={() => quitarAsignacion(a.id, d.id)}
                           className="text-red-500 hover:text-red-700 text-xs font-semibold"
@@ -437,18 +449,18 @@ export default function DocentesAdmin() {
                           >
                             {grados.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
                           </select>
-                          {/* Letras */}
+                          {/* Grupos del grado */}
                           <div className="flex gap-1 items-center">
-                            {LETRAS.map(l => (
+                            {grupos.filter(gr => gr.grado_id === asignGradoId).map(gr => (
                               <button
-                                key={l} type="button"
-                                onClick={() => toggleAsignLetra(l)}
+                                key={gr.id} type="button"
+                                onClick={() => toggleAsignNombre(gr.nombre)}
                                 className={`w-9 h-9 rounded-lg text-sm font-bold border transition ${
-                                  asignLetras.includes(l)
+                                  asignNombres.includes(gr.nombre)
                                     ? 'bg-emerald-800 text-white border-emerald-800'
                                     : 'bg-white text-slate-600 border-slate-300'
                                 }`}
-                              >{l}</button>
+                              >{gr.nombre}</button>
                             ))}
                           </div>
                           {/* Materia */}
@@ -469,7 +481,7 @@ export default function DocentesAdmin() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => guardarNuevaAsignacion(d)}
-                            disabled={guardandoAsign || asignLetras.length === 0 || !asignMateriaId}
+                            disabled={guardandoAsign || asignNombres.length === 0 || !asignMateriaId}
                             className="bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-40"
                           >
                             {guardandoAsign ? 'Guardando...' : 'Guardar'}
@@ -536,30 +548,30 @@ function NuevoDocenteForm({ grados, materiasByGrado, grupos, docentesExistentes,
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [gradoId, setGradoId] = useState(grados[0]?.id ?? null)
-  const [letrasSel, setLetrasSel] = useState([])
+  const [nombresSel, setNombresSel] = useState([])
   const [materiaId, setMateriaId] = useState('')
   const [asignaciones, setAsignaciones] = useState([]) // {grupo_id, materia_id, label}
   const [guardando, setGuardando] = useState(false)
 
   const materiasDisponibles = materiasByGrado[gradoId] || []
 
-  const toggleLetra = (l) => {
-    setLetrasSel(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
+  const toggleNombre = (n) => {
+    setNombresSel(prev => prev.includes(n) ? prev.filter(x => x !== n) : [...prev, n])
   }
 
   const addAsignacion = () => {
-    if (!materiaId || letrasSel.length === 0) return
+    if (!materiaId || nombresSel.length === 0) return
     const grado = grados.find(g => g.id === gradoId)
     const materia = materiasDisponibles.find(m => m.id === Number(materiaId))
-    const nuevas = letrasSel.map(l => {
-      const grupo = grupos.find(g => g.grado_id === gradoId && g.letra === l)
+    const nuevas = nombresSel.map(n => {
+      const grupo = grupos.find(g => g.grado_id === gradoId && g.nombre === n)
       return {
         grupo_id: grupo?.id, materia_id: Number(materiaId),
-        label: `${grado.nombre} ${l} — ${materia.nombre}`,
+        label: `${grado.nombre} ${n} — ${materia.nombre}`,
       }
     }).filter(a => a.grupo_id)
     setAsignaciones(prev => [...prev, ...nuevas])
-    setLetrasSel([])
+    setNombresSel([])
     setMateriaId('')
   }
 
@@ -635,13 +647,13 @@ function NuevoDocenteForm({ grados, materiasByGrado, grupos, docentesExistentes,
             {grados.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
           </select>
           <div className="flex gap-1">
-            {LETRAS.map(l => (
+            {grupos.filter(gr => gr.grado_id === gradoId).map(gr => (
               <button
-                key={l} type="button" onClick={() => toggleLetra(l)}
+                key={gr.id} type="button" onClick={() => toggleNombre(gr.nombre)}
                 className={`w-9 h-9 rounded-lg text-sm font-bold border ${
-                  letrasSel.includes(l) ? 'bg-emerald-800 text-white border-emerald-800' : 'bg-white text-slate-600 border-slate-300'
+                  nombresSel.includes(gr.nombre) ? 'bg-emerald-800 text-white border-emerald-800' : 'bg-white text-slate-600 border-slate-300'
                 }`}
-              >{l}</button>
+              >{gr.nombre}</button>
             ))}
           </div>
           <select

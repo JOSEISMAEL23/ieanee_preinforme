@@ -56,14 +56,13 @@ export default function AsistenciaInforme() {
   const [periodoId, setPeriodoId] = useState(null)
   const [grados, setGrados] = useState([])
   const [gradoId, setGradoId] = useState(null)
-  const [letra, setLetra] = useState('A')
+  const [grupos, setGrupos] = useState([])
+  const [nombre, setNombre] = useState(null)
   const [asignaciones, setAsignaciones] = useState([]) // asignaciones disponibles para el filtro
   const [asignId, setAsignId] = useState(null)
   const [informe, setInforme] = useState(null) // [{ nombre, faltas: [{fecha}], excusas: [{fecha}] }]
   const [cargando, setCargando] = useState(true)
   const [generando, setGenerando] = useState(false)
-
-  const LETRAS = ['A', 'B', 'C']
 
   useEffect(() => {
     (async () => {
@@ -81,7 +80,7 @@ export default function AsistenciaInforme() {
         const { data: asignData } = await supabase
           .from('asignaciones')
           .select(`id, grupo_id, materia_id,
-            grupos(letra, grados(id, nombre)),
+            grupos(nombre, grados(id, nombre)),
             materias(nombre)`)
           .eq('docente_id', docente.id)
         setAsignaciones(asignData || [])
@@ -91,11 +90,24 @@ export default function AsistenciaInforme() {
     })()
   }, [docente.id, esAdmin])
 
+  // Los grupos del grado, en su orden. Antes esta lista era una constante fija
+  // con A, B y C escrita a mano.
   useEffect(() => {
     if (!esAdmin || !gradoId) return
     ;(async () => {
+      const { data } = await supabase
+        .from('grupos').select('id, nombre').eq('grado_id', gradoId).order('orden')
+      const lista = data || []
+      setGrupos(lista)
+      setNombre(prev => lista.some(g => g.nombre === prev) ? prev : (lista[0]?.nombre ?? null))
+    })()
+  }, [gradoId, esAdmin])
+
+  useEffect(() => {
+    if (!esAdmin || !gradoId || !nombre) return
+    ;(async () => {
       const { data: grupo } = await supabase
-        .from('grupos').select('id').eq('grado_id', gradoId).eq('letra', letra).single()
+        .from('grupos').select('id').eq('grado_id', gradoId).eq('nombre', nombre).single()
       if (!grupo) { setAsignId(null); setAsignaciones([]); return }
       const { data: asignData } = await supabase
         .from('asignaciones')
@@ -104,7 +116,7 @@ export default function AsistenciaInforme() {
       setAsignaciones(asignData || [])
       setAsignId(asignData?.[0]?.id ?? null)
     })()
-  }, [gradoId, letra, esAdmin])
+  }, [gradoId, nombre, esAdmin])
 
   const generarInforme = async () => {
     if (!periodoId || !asignId) return
@@ -117,7 +129,7 @@ export default function AsistenciaInforme() {
     let grupoId = asign.grupo_id
     if (!grupoId && esAdmin) {
       const { data: grupo } = await supabase
-        .from('grupos').select('id').eq('grado_id', gradoId).eq('letra', letra).single()
+        .from('grupos').select('id').eq('grado_id', gradoId).eq('nombre', nombre).single()
       grupoId = grupo?.id
     }
     if (!grupoId) { setGenerando(false); return }
@@ -219,7 +231,7 @@ export default function AsistenciaInforme() {
     const wb = XLSX.utils.book_new()
     const periodo = periodos.find(p => p.id === periodoId)
     const a = informe.asign
-    const sheetName = `${a.grupos?.grados?.nombre ?? ''} ${a.grupos?.letra ?? ''} ${a.materias?.nombre ?? ''}`.slice(0, 31)
+    const sheetName = `${a.grupos?.grados?.nombre ?? ''} ${a.grupos?.nombre ?? ''} ${a.materias?.nombre ?? ''}`.slice(0, 31)
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
     XLSX.writeFile(wb, `Asistencia_${sheetName}_${etiquetaPeriodo(periodo)}.xlsx`)
   }
@@ -263,11 +275,11 @@ export default function AsistenciaInforme() {
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">Grupo</label>
                   <div className="flex gap-1">
-                    {LETRAS.map(l => (
-                      <button key={l} onClick={() => setLetra(l)}
+                    {grupos.map(gr => (
+                      <button key={gr.id} onClick={() => setNombre(gr.nombre)}
                         className={`w-9 h-9 rounded-lg text-sm font-bold border ${
-                          letra === l ? 'bg-emerald-800 text-white border-emerald-800' : 'bg-white text-slate-600 border-slate-300'
-                        }`}>{l}</button>
+                          nombre === gr.nombre ? 'bg-emerald-800 text-white border-emerald-800' : 'bg-white text-slate-600 border-slate-300'
+                        }`}>{gr.nombre}</button>
                     ))}
                   </div>
                 </div>
@@ -282,7 +294,7 @@ export default function AsistenciaInforme() {
                   <option key={a.id} value={a.id}>
                     {esAdmin
                       ? `${a.materias?.nombre} — ${a.docentes?.nombre}`
-                      : `${a.grupos?.grados?.nombre} ${a.grupos?.letra} — ${a.materias?.nombre}`}
+                      : `${a.grupos?.grados?.nombre} ${a.grupos?.nombre} — ${a.materias?.nombre}`}
                   </option>
                 ))}
               </select>
@@ -300,7 +312,7 @@ export default function AsistenciaInforme() {
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between flex-wrap gap-3">
               <div>
                 <div className="font-bold text-slate-800">
-                  {informe.asign.grupos?.grados?.nombre} {informe.asign.grupos?.letra} — {informe.asign.materias?.nombre}
+                  {informe.asign.grupos?.grados?.nombre} {informe.asign.grupos?.nombre} — {informe.asign.materias?.nombre}
                   {esAdmin && informe.asign.docentes?.nombre && (
                     <span className="text-slate-500 font-normal text-sm ml-2">· {informe.asign.docentes.nombre}</span>
                   )}

@@ -4,7 +4,6 @@ import { supabase } from '../../lib/supabase'
 import { etiquetaPeriodo, etiquetaPeriodoConEstado } from '../../lib/periodos'
 import { useConfiguracion } from '../../context/ConfiguracionContext'
 
-const LETRAS = ['A', 'B', 'C']
 const COLUMNAS_GRILLA = 5
 
 export default function ConsolidadoAdmin() {
@@ -13,7 +12,8 @@ export default function ConsolidadoAdmin() {
   const [periodoId, setPeriodoId] = useState(null)
   const [grados, setGrados] = useState([])
   const [gradoId, setGradoId] = useState(null)
-  const [letra, setLetra] = useState('A')
+  const [grupos, setGrupos] = useState([])
+  const [nombre, setNombre] = useState(null)
   const [vista, setVista] = useState('matriz') // 'matriz' | 'boletines'
   const [datos, setDatos] = useState(null) // { materias, estudiantes, marcasPorEstudiante }
   const [exportandoTodo, setExportandoTodo] = useState(false)
@@ -33,12 +33,25 @@ export default function ConsolidadoAdmin() {
     })()
   }, [])
 
+  // Los grupos del grado seleccionado, en su orden. Antes esta lista era una
+  // constante fija con A, B y C escrita a mano; ahora sale de la tabla.
+  useEffect(() => {
+    if (!gradoId) { setGrupos([]); return }
+    ;(async () => {
+      const { data } = await supabase
+        .from('grupos').select('id, nombre').eq('grado_id', gradoId).order('orden')
+      const lista = data || []
+      setGrupos(lista)
+      setNombre(prev => lista.some(g => g.nombre === prev) ? prev : (lista[0]?.nombre ?? null))
+    })()
+  }, [gradoId])
+
   const cargarDatos = async () => {
-    if (!periodoId || !gradoId) return
+    if (!periodoId || !gradoId || !nombre) return
     setDatos(null)
 
     const { data: grupo } = await supabase
-      .from('grupos').select('id').eq('grado_id', gradoId).eq('letra', letra).single()
+      .from('grupos').select('id').eq('grado_id', gradoId).eq('nombre', nombre).single()
     if (!grupo) { setDatos({ materias: [], estudiantes: [], marcasPorEstudiante: {} }); return }
 
     const { data: materias } = await supabase
@@ -62,7 +75,7 @@ export default function ConsolidadoAdmin() {
     setDatos({ materias: materias || [], estudiantes: estudiantes || [], marcasPorEstudiante })
   }
 
-  useEffect(() => { cargarDatos() }, [periodoId, gradoId, letra])
+  useEffect(() => { cargarDatos() }, [periodoId, gradoId, nombre])
 
   const grado = grados.find(g => g.id === gradoId)
   const periodo = periodos.find(p => p.id === periodoId)
@@ -78,8 +91,8 @@ export default function ConsolidadoAdmin() {
     })
     const ws = XLSX.utils.aoa_to_sheet([header, ...filas])
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, `${grado.nombre} ${letra}`.slice(0, 31))
-    XLSX.writeFile(wb, `Consolidado_${grado.nombre}${letra}_${etiquetaPeriodo(periodo)}.xlsx`)
+    XLSX.utils.book_append_sheet(wb, ws, `${grado.nombre} ${nombre}`.slice(0, 31))
+    XLSX.writeFile(wb, `Consolidado_${grado.nombre}${nombre}_${etiquetaPeriodo(periodo)}.xlsx`)
   }
 
   const exportarTodoExcel = async () => {
@@ -92,10 +105,9 @@ export default function ConsolidadoAdmin() {
     for (const g of grados) {
       const { data: materiasG } = await supabase
         .from('materias').select('*').eq('grado_id', g.id).order('orden')
-      for (const l of LETRAS) {
-        const { data: grupo } = await supabase
-          .from('grupos').select('id').eq('grado_id', g.id).eq('letra', l).single()
-        if (!grupo) continue
+      const { data: gruposG } = await supabase
+        .from('grupos').select('id, nombre').eq('grado_id', g.id).order('orden')
+      for (const grupo of gruposG || []) {
         const { data: estudiantesG } = await supabase
           .from('estudiantes').select('*').eq('grupo_id', grupo.id).order('nombre')
         if (!estudiantesG || estudiantesG.length === 0) continue
@@ -115,10 +127,10 @@ export default function ConsolidadoAdmin() {
           return [e.nombre, ...materiasG.map(m => dif.has(m.id) ? 'X' : ''), dif.size]
         })
         const ws = XLSX.utils.aoa_to_sheet([header, ...filas])
-        XLSX.utils.book_append_sheet(wb, ws, `${g.nombre}${l}`.slice(0, 31))
+        XLSX.utils.book_append_sheet(wb, ws, `${g.nombre}${grupo.nombre}`.slice(0, 31))
 
         const conDificultad = filas.filter(f => f[f.length - 1] > 0).length
-        resumenFilas.push([`${g.nombre} ${l}`, estudiantesG.length, conDificultad])
+        resumenFilas.push([`${g.nombre} ${grupo.nombre}`, estudiantesG.length, conDificultad])
       }
     }
 
@@ -151,11 +163,11 @@ export default function ConsolidadoAdmin() {
             {grados.map(g => <option key={g.id} value={g.id}>{g.nombre}</option>)}
           </select>
           <div className="flex gap-1">
-            {LETRAS.map(l => (
-              <button key={l} onClick={() => setLetra(l)}
+            {grupos.map(gr => (
+              <button key={gr.id} onClick={() => setNombre(gr.nombre)}
                 className={`w-9 h-9 rounded-lg text-sm font-bold border ${
-                  letra === l ? 'bg-emerald-800 text-white border-emerald-800' : 'bg-white text-slate-600 border-slate-300'
-                }`}>{l}</button>
+                  nombre === gr.nombre ? 'bg-emerald-800 text-white border-emerald-800' : 'bg-white text-slate-600 border-slate-300'
+                }`}>{gr.nombre}</button>
             ))}
           </div>
 
@@ -174,8 +186,8 @@ export default function ConsolidadoAdmin() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => {
-              if (!periodoId || !gradoId) return
-              window.open(`/admin/consolidado/imprimir?periodo=${periodoId}&grado=${gradoId}&letra=${letra}`, '_blank')
+              if (!periodoId || !gradoId || !nombre) return
+              window.open(`/admin/consolidado/imprimir?periodo=${periodoId}&grado=${gradoId}&grupo=${encodeURIComponent(nombre)}`, '_blank')
             }}
             className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-semibold">
             Imprimir / Guardar PDF (boletines)
@@ -204,10 +216,10 @@ export default function ConsolidadoAdmin() {
             Este grupo no tiene estudiantes cargados. Ve a "Estudiantes".
           </p>
         ) : vista === 'matriz' ? (
-          <VistaMatriz grado={grado} letra={letra} datos={datos} />
+          <VistaMatriz grado={grado} grupoNombre={nombre} datos={datos} />
         ) : (
           <VistaBoletines
-            grado={grado} letra={letra} periodo={periodo} datos={datos}
+            grado={grado} grupoNombre={nombre} periodo={periodo} datos={datos}
             nombreInstitucion={config?.nombre_institucion}
             logoUrl={config?.logo_url}
           />
@@ -229,11 +241,11 @@ export default function ConsolidadoAdmin() {
   )
 }
 
-function VistaMatriz({ grado, letra, datos }) {
+function VistaMatriz({ grado, grupoNombre, datos }) {
   const { materias, estudiantes, marcasPorEstudiante } = datos
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-6 overflow-x-auto">
-      <h3 className="text-base font-bold text-slate-800 mb-4">{grado?.nombre} {letra}</h3>
+      <h3 className="text-base font-bold text-slate-800 mb-4">{grado?.nombre} {grupoNombre}</h3>
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr>
@@ -267,7 +279,7 @@ function VistaMatriz({ grado, letra, datos }) {
   )
 }
 
-function VistaBoletines({ grado, letra, periodo, datos, nombreInstitucion, logoUrl }) {
+function VistaBoletines({ grado, grupoNombre, periodo, datos, nombreInstitucion, logoUrl }) {
   const { materias, estudiantes, marcasPorEstudiante } = datos
   const estudiantesConDificultad = estudiantes.filter(e => (marcasPorEstudiante[e.id]?.size ?? 0) > 0)
 
@@ -294,7 +306,7 @@ function VistaBoletines({ grado, letra, periodo, datos, nombreInstitucion, logoU
               esUltimo={i === grupoEst.length - 1}
               estudiante={est}
               grado={grado}
-              letra={letra}
+              grupoNombre={grupoNombre}
               periodo={periodo}
               materias={materias}
               dificultades={marcasPorEstudiante[est.id] || new Set()}
@@ -308,7 +320,7 @@ function VistaBoletines({ grado, letra, periodo, datos, nombreInstitucion, logoU
   )
 }
 
-function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificultades, nombreInstitucion, logoUrl, esUltimo }) {
+function BoletinEstudiante({ estudiante, grado, grupoNombre, periodo, materias, dificultades, nombreInstitucion, logoUrl, esUltimo }) {
   const filas = []
   for (let i = 0; i < materias.length; i += COLUMNAS_GRILLA) filas.push(materias.slice(i, i + COLUMNAS_GRILLA))
   const ultimaFila = filas[filas.length - 1]
@@ -338,7 +350,7 @@ function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificu
 
       <div className="flex flex-wrap gap-x-5 gap-y-0.5 mb-1 text-[11px]">
         <span><b>NOMBRE:</b> {estudiante.nombre}</span>
-        <span><b>GRADO:</b> {grado?.nombre} {letra}</span>
+        <span><b>GRADO:</b> {grado?.nombre} {grupoNombre}</span>
         <span><b>FECHA:</b> __________</span>
       </div>
 

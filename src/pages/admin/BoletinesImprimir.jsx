@@ -9,7 +9,7 @@ export default function BoletinesImprimir() {
   const [searchParams] = useSearchParams()
   const periodoId = Number(searchParams.get('periodo'))
   const gradoId = Number(searchParams.get('grado'))
-  const letra = searchParams.get('letra')
+  const grupoNombre = searchParams.get('grupo')
 
   const [cargando, setCargando] = useState(true)
   const [datos, setDatos] = useState(null)
@@ -19,7 +19,7 @@ export default function BoletinesImprimir() {
       const { data: config } = await supabase.from('configuracion').select('*').eq('id', 1).single()
       const { data: periodo } = await supabase.from('periodos').select('*').eq('id', periodoId).single()
       const { data: grado } = await supabase.from('grados').select('*').eq('id', gradoId).single()
-      const { data: grupo } = await supabase.from('grupos').select('id').eq('grado_id', gradoId).eq('letra', letra).single()
+      const { data: grupo } = await supabase.from('grupos').select('id').eq('grado_id', gradoId).eq('nombre', grupoNombre).single()
 
       const { data: materias } = await supabase
         .from('materias').select('*').eq('grado_id', gradoId).order('orden')
@@ -49,7 +49,7 @@ export default function BoletinesImprimir() {
       })
       setCargando(false)
     })()
-  }, [periodoId, gradoId, letra])
+  }, [periodoId, gradoId, grupoNombre])
 
   useEffect(() => {
     if (!cargando && datos) {
@@ -93,7 +93,7 @@ export default function BoletinesImprimir() {
                 esUltimo={i === grupoEst.length - 1}
                 estudiante={est}
                 grado={grado}
-                letra={letra}
+                grupoNombre={grupoNombre}
                 periodo={periodo}
                 materias={materias}
                 dificultades={marcasPorEstudiante[est.id] || new Set()}
@@ -108,7 +108,7 @@ export default function BoletinesImprimir() {
   )
 }
 
-function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificultades, nombreInstitucion, logoUrl, esUltimo }) {
+function BoletinEstudiante({ estudiante, grado, grupoNombre, periodo, materias, dificultades, nombreInstitucion, logoUrl, esUltimo }) {
   const filas = []
   for (let i = 0; i < materias.length; i += COLUMNAS_GRILLA) filas.push(materias.slice(i, i + COLUMNAS_GRILLA))
   const ultimaFila = filas[filas.length - 1]
@@ -142,7 +142,7 @@ function BoletinEstudiante({ estudiante, grado, letra, periodo, materias, dificu
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0 20px', marginBottom: 4, fontSize: 11 }}>
         <span><b>NOMBRE:</b> {estudiante.nombre}</span>
-        <span><b>GRADO:</b> {grado?.nombre} {letra}</span>
+        <span><b>GRADO:</b> {grado?.nombre} {grupoNombre}</span>
         <span><b>FECHA:</b> __________</span>
       </div>
 

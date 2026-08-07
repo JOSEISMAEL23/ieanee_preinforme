@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 
-const LETRAS = ['A', 'B', 'C']
-
 const MAPA_GRADOS_PALABRA = {
   transicion: 'transicion',
   primero: '1',
@@ -33,7 +31,8 @@ function claveCanonica(gradoTexto) {
 export default function EstudiantesAdmin() {
   const [grados, setGrados] = useState([])
   const [gradoId, setGradoId] = useState(null)
-  const [letra, setLetra] = useState('A')
+  const [grupos, setGrupos] = useState([])
+  const [nombre, setNombre] = useState(null)
   const [grupoId, setGrupoId] = useState(null)
   const [estudiantes, setEstudiantes] = useState([])
   const [nuevoNombre, setNuevoNombre] = useState('')
@@ -50,14 +49,17 @@ export default function EstudiantesAdmin() {
     if (data && data.length && !gradoId) setGradoId(data[0].id)
   }
 
-  const resolverGrupoId = async (gid, l) => {
+  // Los grupos del grado, en su orden. Antes esta lista era una constante fija
+  // con A, B y C, y el id se resolvia con una consulta aparte.
+  const cargarGrupos = async (gid) => {
     const { data } = await supabase
       .from('grupos')
-      .select('id')
+      .select('id, nombre')
       .eq('grado_id', gid)
-      .eq('letra', l)
-      .single()
-    return data?.id ?? null
+      .order('orden')
+    const lista = data || []
+    setGrupos(lista)
+    setNombre(prev => lista.some(g => g.nombre === prev) ? prev : (lista[0]?.nombre ?? null))
   }
 
   const cargarEstudiantes = async (gid) => {
@@ -74,16 +76,19 @@ export default function EstudiantesAdmin() {
 
   useEffect(() => {
     if (!gradoId) return
-    resolverGrupoId(gradoId, letra).then(gid => {
-      setGrupoId(gid)
-      cargarEstudiantes(gid)
-    })
-  }, [gradoId, letra])
+    cargarGrupos(gradoId)
+  }, [gradoId])
+
+  useEffect(() => {
+    const gid = grupos.find(g => g.nombre === nombre)?.id ?? null
+    setGrupoId(gid)
+    cargarEstudiantes(gid)
+  }, [grupos, nombre])
 
   const agregarEstudiante = async () => {
-    const nombre = nuevoNombre.trim()
-    if (!nombre || !grupoId) return
-    const { error } = await supabase.from('estudiantes').insert({ grupo_id: grupoId, nombre })
+    const nombreEst = nuevoNombre.trim()
+    if (!nombreEst || !grupoId) return
+    const { error } = await supabase.from('estudiantes').insert({ grupo_id: grupoId, nombre: nombreEst })
     if (error) { setMensaje('Error: ' + error.message); return }
     setNuevoNombre('')
     setMensaje('')
@@ -105,12 +110,15 @@ export default function EstudiantesAdmin() {
 
     const { data: gruposData } = await supabase
       .from('grupos')
-      .select('id, letra, grados(nombre)')
+      .select('id, nombre, grados(nombre)')
 
+    // Clave: grado canonico + nombre del grupo normalizado. El separador evita
+    // que ("6", "1A") y ("61", "A") acaben en la misma clave.
     const mapaGrupos = {}
+    const nombresGrupo = new Set()
     gruposData.forEach(g => {
-      const clave = claveCanonica(g.grados.nombre) + g.letra.toUpperCase()
-      mapaGrupos[clave] = g.id
+      mapaGrupos[claveCanonica(g.grados.nombre) + '|' + normaliza(g.nombre)] = g.id
+      nombresGrupo.add(normaliza(g.nombre))
     })
 
     const registros = []
@@ -122,12 +130,28 @@ export default function EstudiantesAdmin() {
       const nombreTexto = (row['Nombre'] ?? row['nombre'] ?? row['Estudiante'] ?? '').toString().trim()
       if (!grupoTexto || !nombreTexto) { omitidas++; return }
 
-      const letraDetectada = grupoTexto.slice(-1).toUpperCase()
-      if (!LETRAS.includes(letraDetectada)) { omitidas++; return }
-      const gradoTexto = grupoTexto.slice(0, -1).trim()
-      const clave = claveCanonica(gradoTexto) + letraDetectada
-      const gid = mapaGrupos[clave]
-      if (!gid) { omitidas++; gradosNoReconocidos.add(gradoTexto); return }
+      // Separar "6A" en grado + grupo. Antes se daba por hecho que el grupo
+      // era el ultimo caracter del texto y que estaba en la lista fija A/B/C,
+      // asi que los grupos D y E se descartaban aqui. Ahora se prueba cada
+      // corte del texto contra los grupos que existen de verdad, del sufijo
+      // mas corto al mas largo.
+      let gid = null
+      let gradoDelTexto = null
+      for (let i = grupoTexto.length - 1; i >= 1; i--) {
+        const nombreGrupo = normaliza(grupoTexto.slice(i))
+        if (!nombresGrupo.has(nombreGrupo)) continue
+        const gradoTexto = grupoTexto.slice(0, i).trim()
+        if (gradoDelTexto === null) gradoDelTexto = gradoTexto
+        const encontrado = mapaGrupos[claveCanonica(gradoTexto) + '|' + nombreGrupo]
+        if (encontrado) { gid = encontrado; break }
+      }
+      // Se nombra el grado solo cuando el grupo si existe en algun grado: es
+      // el mismo criterio de hoy, cuando tenia que estar en la lista fija.
+      if (!gid) {
+        omitidas++
+        if (gradoDelTexto) gradosNoReconocidos.add(gradoDelTexto)
+        return
+      }
 
       registros.push({ grupo_id: gid, nombre: nombreTexto })
     })
@@ -188,7 +212,7 @@ export default function EstudiantesAdmin() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-lg font-bold text-slate-800 mb-1">Estudiantes por grupo</h2>
         <p className="text-sm text-slate-500 mb-4">
-          Selecciona el grado y la letra del grupo para ver, agregar o eliminar estudiantes.
+          Selecciona el grado y el grupo para ver, agregar o eliminar estudiantes.
         </p>
 
         <div className="flex gap-6">
@@ -208,17 +232,17 @@ export default function EstudiantesAdmin() {
 
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-4">
-              {LETRAS.map(l => (
+              {grupos.map(gr => (
                 <button
-                  key={l}
-                  onClick={() => setLetra(l)}
+                  key={gr.id}
+                  onClick={() => setNombre(gr.nombre)}
                   className={`w-10 h-10 rounded-lg text-sm font-bold border ${
-                    letra === l
+                    nombre === gr.nombre
                       ? 'bg-emerald-800 text-white border-emerald-800'
                       : 'bg-white text-slate-600 border-slate-300 hover:border-emerald-700'
                   }`}
                 >
-                  {l}
+                  {gr.nombre}
                 </button>
               ))}
               <span className="text-sm text-slate-500 ml-2">

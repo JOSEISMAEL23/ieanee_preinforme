@@ -8,6 +8,7 @@ import CambiarPassword from './pages/CambiarPassword'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AjustesInstitucion from './pages/admin/AjustesInstitucion'
 import PeriodosAdmin from './pages/admin/PeriodosAdmin'
+import EstructuraAdmin from './pages/admin/EstructuraAdmin'
 import MateriasAdmin from './pages/admin/MateriasAdmin'
 import EstudiantesAdmin from './pages/admin/EstudiantesAdmin'
 import DocentesAdmin from './pages/admin/DocentesAdmin'
@@ -74,6 +75,14 @@ function App() {
               <Route path="periodos" element={
                 <ProtectedRoute permisoRequerido="gestionar_periodos">
                   <PeriodosAdmin />
+                </ProtectedRoute>
+              } />
+              {/* Grados y grupos son la estructura del colegio: quien la
+                  toca puede dejar sin grupo a estudiantes ya matriculados.
+                  Por eso va en el grupo de "solo admin", como Materias. */}
+              <Route path="estructura" element={
+                <ProtectedRoute rolRequerido="admin">
+                  <EstructuraAdmin />
                 </ProtectedRoute>
               } />
               <Route path="materias" element={

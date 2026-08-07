@@ -156,7 +156,7 @@ export default function MateriasAdmin() {
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-lg font-bold text-slate-800 mb-1">Materias por grado</h2>
         <p className="text-sm text-slate-500 mb-4">
-          Las materias que definas para un grado aplican automáticamente a sus grupos A, B y C.
+          Las materias que definas para un grado aplican automáticamente a todos sus grupos.
         </p>
 
         <div className="flex gap-6">

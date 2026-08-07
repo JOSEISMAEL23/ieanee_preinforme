@@ -10,8 +10,9 @@
 --   monta un trigger que mantiene `letra` y `nombre` sincronizadas mientras
 --   conviven.
 --
---   Única diferencia con la spec §3.1: el paso 1b, que quita ese UNIQUE. El
---   porqué está en el HALLAZGO del final del archivo.
+--   Dos diferencias con la spec §3.1, las dos documentadas al final del
+--   archivo: el paso 1b (quitar ese UNIQUE) y el cuerpo de la función del
+--   paso 5 (el trigger de la spec no sincronizaba en UPDATE).
 --
 -- POR QUÉ ASÍ Y NO RENOMBRANDO DE GOLPE
 --   Renombrar `letra -> nombre` exige que la base y el frontend cambien en el
@@ -83,14 +84,29 @@ update public.grupos g set orden = num.n from num where num.id = g.id;
 -- 5. EL PUENTE. Mientras convivan las dos formas, esto las mantiene iguales.
 --    Sin el trigger: el código viejo inserta solo `letra` -> `nombre` queda NULL
 --    y esa fila es invisible para el código nuevo (y al revés).
+--    Cubre INSERT y UPDATE por separado, porque son dos problemas distintos:
+--    al crear hay una columna vacía que rellenar; al renombrar no hay ninguna
+--    vacía y hay que mirar cuál cambió. Ver el HALLAZGO 2 del final.
 create or replace function public.grupos_sync_nombre_letra()
 returns trigger language plpgsql as $$
 begin
-  if new.nombre is null and new.letra is not null then
-    new.nombre := new.letra;                 -- escribió el código VIEJO
-  elsif new.letra is null and new.nombre is not null then
-    new.letra := left(new.nombre, 1);        -- escribió el código NUEVO
+  if tg_op = 'INSERT' then
+    -- Al crear: se rellena la columna que venga vacia
+    if new.nombre is null and new.letra is not null then
+      new.nombre := new.letra;               -- escribio el codigo VIEJO
+    elsif new.letra is null and new.nombre is not null then
+      new.letra := left(new.nombre, 1);      -- escribio el codigo NUEVO
+    end if;
+  else
+    -- Al RENOMBRAR: ninguna viene vacia. Hay que mirar cual CAMBIO
+    -- y arrastrar la otra detras. Sin esta rama el puente es solo de ida.
+    if new.nombre is distinct from old.nombre and new.nombre is not null then
+      new.letra := left(new.nombre, 1);      -- renombro el codigo NUEVO
+    elsif new.letra is distinct from old.letra and new.letra is not null then
+      new.nombre := new.letra;               -- renombro el codigo VIEJO
+    end if;
   end if;
+
   if new.orden is null then
     select coalesce(max(orden), 0) + 1 into new.orden
     from public.grupos where grado_id = new.grado_id;
@@ -120,9 +136,10 @@ commit;
 -- ============================================================================
 -- VERIFICACIÓN DE LA FASE 1 — correr DESPUÉS, en la misma sesión
 -- ============================================================================
--- Probar los DOS lados, como en la capa 0 de RESTRICT. Los pasos d y f son el
--- corazón de esta fase: comprueban que el puente cruza en las dos direcciones.
--- Si solo se verifica d, se está probando media migración.
+-- Probar los DOS lados, como en la capa 0 de RESTRICT. Los pasos d/f (crear) e
+-- i/j (renombrar) son el corazón de esta fase: comprueban que el puente cruza
+-- en las dos direcciones y en las dos operaciones. Si solo se verifica d, se
+-- está probando un cuarto de la migración.
 --
 -- -- a) La estructura quedó como se espera
 -- select column_name, data_type, is_nullable
@@ -175,15 +192,30 @@ commit;
 -- values ((select id from public.grados where nombre like '6%'), 'D');
 -- -- esperado: error 23505
 --
--- -- h) Limpiar las pruebas (funciona porque están vacíos;
+-- -- i) RENOMBRAR como lo hará el CÓDIGO NUEVO: se toca solo `nombre`
+-- update public.grupos set nombre='1-01'
+-- where nombre='D' and grado_id=(select id from public.grados where nombre like '6%');
+-- select nombre, letra from public.grupos where nombre='1-01';
+-- -- esperado: 1-01 | 1   <- `letra` siguió al nombre.
+-- --           Si sale 1-01 | D, el trigger no maneja UPDATE.
+--
+-- -- j) RENOMBRAR como lo haría el CÓDIGO VIEJO: se toca solo `letra`
+-- update public.grupos set letra='Z'
+-- where nombre='1-01' and grado_id=(select id from public.grados where nombre like '6%');
+-- select nombre, letra from public.grupos where letra='Z';
+-- -- esperado: Z | Z
+--
+-- -- k) Limpiar TODAS las pruebas (funciona porque están vacíos;
 -- --    RESTRICT solo bloquea si tienen estudiantes dentro)
 -- delete from public.grupos
--- where nombre in ('D','E')
---   and grado_id=(select id from public.grados where nombre like '6%');
+-- where grado_id=(select id from public.grados where nombre like '6%')
+--   and orden > 3;
+-- -- esperado: DELETE 2   <- vuelven a quedar solo A, B, C
 
 
 -- ============================================================================
--- ⚠️ HALLAZGO — RESUELTO. Registro de la decisión.
+-- ⚠️ HALLAZGO 1 — RESUELTO. Registro de la decisión.
+--    El UNIQUE (grado_id, letra) que la spec no listaba
 -- ============================================================================
 --
 -- ESTADO: aplicado el 2026-08-06. Es el paso 1b del bloque de arriba.
@@ -244,6 +276,48 @@ commit;
 --      left(nombre,1). La más frágil de las tres: mete lógica no trivial en un
 --      puente que existe para morir en unos días, y habría que probarla.
 --
--- Lo que NO cambia: la única diferencia con la spec §3.1 es el paso 1b. El
--- resto del bloque sigue tal cual.
+-- ============================================================================
+-- ⚠️ HALLAZGO 2 — RESUELTO. Registro de la decisión.
+--    El trigger de la spec era un puente de una sola dirección: INSERT
+-- ============================================================================
+--
+-- ESTADO: aplicado el 2026-08-06. Es la función del paso 5 del bloque de
+--         arriba, reescrita. Este texto es el registro del porqué.
+--
+-- La función de la spec §3.1 decidía qué rellenar preguntando cuál de las dos
+-- columnas venía vacía:
+--
+--     if new.nombre is null and new.letra is not null then ...
+--     elsif new.letra is null and new.nombre is not null then ...
+--
+-- Eso solo describe un INSERT. En un UPDATE de una fila que ya existe
+-- **ninguna de las dos columnas viene vacía**, así que las dos ramas del if se
+-- saltan y el trigger no sincroniza nada, aunque esté declarado
+-- `before insert or update`.
+--
+-- EL SÍNTOMA que producía, en la fase 2 y en producción: renombrar el grupo
+-- "A" a "1-01" desde la pantalla nueva escribe solo `nombre`. `letra` se queda
+-- congelada en "A". A partir de ahí las dos columnas dicen cosas distintas
+-- sobre la misma fila, y cualquier pantalla que todavía lea `letra` —durante
+-- la convivencia son las 11— muestra el grupo con su nombre viejo. El puente
+-- solo cruzaba de ida.
+--
+-- POR QUÉ NO LO CAZARON LAS VERIFICACIONES a..h: porque las ocho probaban
+-- únicamente INSERT. Los pasos d y f, que la spec llama "el corazón de esta
+-- fase" por cruzar el puente en las dos direcciones, cruzaban las dos
+-- direcciones de una sola operación. La verificación daba verde con el trigger
+-- roto — exactamente el mismo patrón que el HALLAZGO 1, donde la fase 1 también
+-- pasaba entera y lo que estallaba era la fase 2.
+--
+-- EL ARREGLO: separar por `tg_op`. Al crear se rellena la columna vacía, como
+-- antes. Al renombrar se compara con `old` para ver cuál de las dos cambió y se
+-- arrastra la otra detrás.
+--
+-- Y SE AÑADIERON LOS PASOS i y j a la verificación, que renombran por cada
+-- lado, porque un arreglo sin la comprobación que lo vigila vuelve a romperse
+-- en silencio la próxima vez que alguien toque la función.
+--
+-- ============================================================================
+-- Lo que NO cambia: las únicas diferencias con la spec §3.1 son el paso 1b y
+-- el cuerpo de la función del paso 5. El resto del bloque sigue tal cual.
 -- ============================================================================

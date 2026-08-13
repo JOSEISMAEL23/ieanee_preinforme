@@ -6,7 +6,7 @@
 --
 -- Carga únicamente:
 --   1. grados          (la escalera académica)
---   2. grupos          (cada grado x sus letras)
+--   2. grupos          (cada grado x sus grupos)
 --   3. configuracion   (la fila única id=1 que la app asume que existe)
 --   4. parametros      (Saber/Hacer/Ser + pesos de sus subparámetros)
 --
@@ -44,17 +44,29 @@ on conflict (id) do nothing;
 -- ---------------------------------------------------------------------
 -- 2. GRUPOS                                          << AJUSTAR (2 de 4)
 -- ---------------------------------------------------------------------
--- Genera un grupo por cada grado x cada letra de la lista.
--- Si el colegio maneja grupos A hasta E, cambia la lista por:
+-- Genera un grupo por cada grado x cada nombre de la lista.
+--
+-- EL NOMBRE ES LIBRE. No tiene que ser una letra: vale 'A', '1-01',
+-- 'Mañana' o lo que use el colegio. Ejemplos de lista:
 --     array['A','B','C','D','E']
--- Si un grado concreto tiene menos grupos, bórralos después a mano
--- desde el Table Editor.
+--     array['1-01','1-02','1-03']
+-- El 'orden' (1, 2, 3...) lo pone solo la posición en la lista, y es
+-- lo que decide cómo se ordenan en pantalla.
+--
+-- ESTE BLOQUE YA ES OPCIONAL: desde /admin/estructura el colegio crea
+-- y renombra sus grados y grupos sin tocar SQL. Sirve para dejar la
+-- instancia sembrada de una vez; si prefieres que el colegio lo arme
+-- desde la app, puedes saltarte este insert.
+--
+-- Si un grado concreto tiene menos grupos, bórralos después desde
+-- /admin/estructura.
 -- ---------------------------------------------------------------------
-insert into public.grupos (grado_id, letra)
-select g.id, l.letra
+insert into public.grupos (grado_id, nombre, orden)
+select g.id, n.nombre, n.orden::int
 from public.grados g
-cross join unnest(array['A','B','C']) as l(letra)   -- << AJUSTAR las letras
-order by g.orden, l.letra
+cross join unnest(array['A','B','C'])   -- << AJUSTAR los nombres
+     with ordinality as n(nombre, orden)
+order by g.orden, n.orden
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------
@@ -156,7 +168,7 @@ from public.parametros p
 order by p.orden;
 
 -- Listado legible de los grupos creados, para revisar de un vistazo:
-select g.nombre as grado, string_agg(gr.letra, ', ' order by gr.letra) as grupos
+select g.nombre as grado, string_agg(gr.nombre, ', ' order by gr.orden) as grupos
 from public.grados g
 join public.grupos gr on gr.grado_id = g.id
 group by g.nombre, g.orden

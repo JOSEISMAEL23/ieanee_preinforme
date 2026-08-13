@@ -1,38 +1,18 @@
--- =====================================================================
--- 00-esquema-completo.sql — Esquema COMPLETO de la app
--- =====================================================================
--- Generado con pg_dump desde el proyecto de produccion.
--- Contiene: tablas, funciones, triggers, indices y TODAS las politicas
--- RLS. NO contiene datos (--schema-only).
---
--- COMO USARLO en un colegio nuevo:
---   1. Supabase Dashboard -> SQL Editor -> New query
---   2. Pegar este archivo COMPLETO -> Run
---   3. Despues ejecutar sql/01-semilla.sql
---
--- Ajustes hechos a mano sobre la salida de pg_dump (no revertirlos):
---   * Eliminadas las lineas \restrict y \unrestrict: son metacomandos de
---     psql y el SQL Editor de Supabase NO los entiende (da error de
---     sintaxis en la primera linea).
---   * Comentado "CREATE SCHEMA public": ese esquema ya existe en
---     cualquier proyecto Supabase nuevo y el comando falla.
---   * Comentadas las 24 lineas "ALTER DEFAULT PRIVILEGES" y el
---     "COMMENT ON SCHEMA public" (van marcadas con "-- [kit]"). El SQL
---     Editor corre como el rol postgres, que NO puede cambiar los
---     privilegios por defecto de otro rol (supabase_admin) y falla con:
---         ERROR: 42501: permission denied to change default privileges
---     Son innecesarias: todo proyecto Supabase nuevo ya trae esos
---     privilegios por defecto configurados igual.
---
--- REGENERAR cuando cambie el esquema en produccion: ver INSTALACION.md
--- y volver a aplicar los TRES ajustes de arriba.
--- =====================================================================
-
 --
 -- PostgreSQL database dump
 --
 
--- (metacomando \restrict de psql eliminado: el SQL Editor de Supabase no lo entiende)
+-- ATENCION: ESTE ARCHIVO ES UN DUMP EDITADO A MANO. NO PEGUES UN DUMP CRUDO ENCIMA.
+-- Si lo regeneras con pg_dump, vuelve a quitar estas cuatro cosas o el kit no instala:
+--   1. los dos metacomandos de psql, restrict y unrestrict (empiezan por barra
+--      invertida) -> el SQL Editor de Supabase no los entiende
+--   2. CREATE SCHEMA public             -> en Supabase ya existe
+--   3. COMMENT ON SCHEMA public         -> no eres dueno del schema
+--   4. las 24 ALTER DEFAULT PRIVILEGES  -> permission denied
+-- Banderas correctas: --schema=public --no-owner --schema-only
+-- NO uses --no-privileges: los 118 GRANT son necesarios.
+-- Historia: commit fe3ee83 y el 2026-08-13, cuando se repitieron las cuatro.
+
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -50,17 +30,13 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
 --
 
--- CREATE SCHEMA public;   -- desactivado: el esquema public ya existe en todo proyecto Supabase nuevo
 
 
 --
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
 --
 
--- [kit] COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
@@ -357,8 +333,8 @@ ALTER SEQUENCE public.grados_id_seq OWNED BY public.grados.id;
 CREATE TABLE public.grupos (
     id integer NOT NULL,
     grado_id integer NOT NULL,
-    letra text NOT NULL,
-    CONSTRAINT grupos_letra_check CHECK ((letra = ANY (ARRAY['A'::text, 'B'::text, 'C'::text])))
+    nombre text NOT NULL,
+    orden integer NOT NULL
 );
 
 
@@ -546,7 +522,6 @@ ALTER TABLE public.parametros ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE public.periodos (
     id integer NOT NULL,
     nombre text NOT NULL,
-    anio integer DEFAULT EXTRACT(year FROM (now() AT TIME ZONE 'America/Bogota'::text)) NOT NULL,
     activo boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     fecha_inicio timestamp with time zone,
@@ -554,7 +529,8 @@ CREATE TABLE public.periodos (
     asistencia_fecha_inicio timestamp with time zone,
     asistencia_fecha_limite timestamp with time zone,
     calificacion_fecha_inicio timestamp with time zone,
-    calificacion_fecha_limite timestamp with time zone
+    calificacion_fecha_limite timestamp with time zone,
+    anio integer DEFAULT (EXTRACT(year FROM (now() AT TIME ZONE 'America/Bogota'::text)))::integer NOT NULL
 );
 
 
@@ -814,11 +790,11 @@ ALTER TABLE ONLY public.grados
 
 
 --
--- Name: grupos grupos_grado_id_letra_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: grupos grupos_grado_id_nombre_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.grupos
-    ADD CONSTRAINT grupos_grado_id_letra_key UNIQUE (grado_id, letra);
+    ADD CONSTRAINT grupos_grado_id_nombre_key UNIQUE (grado_id, nombre);
 
 
 --
@@ -2064,69 +2040,13 @@ GRANT ALL ON SEQUENCE public.subparametros_id_seq TO authenticated;
 GRANT ALL ON SEQUENCE public.subparametros_id_seq TO service_role;
 
 
---
--- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO service_role;
+-- (Quitadas a mano: las 24 ALTER DEFAULT PRIVILEGES que pg_dump escribe aqui.
+--  En Supabase dan "permission denied": no eres dueno de los roles postgres
+--  ni supabase_admin. Los 118 GRANT de arriba SI hacen falta y se quedan.)
 
 
 --
 -- PostgreSQL database dump complete
 --
 
--- (metacomando \unrestrict de psql eliminado: el SQL Editor de Supabase no lo entiende)
 

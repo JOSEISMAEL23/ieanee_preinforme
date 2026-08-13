@@ -1,38 +1,8 @@
--- =====================================================================
--- 00-esquema-completo.sql — Esquema COMPLETO de la app
--- =====================================================================
--- Generado con pg_dump desde el proyecto de produccion.
--- Contiene: tablas, funciones, triggers, indices y TODAS las politicas
--- RLS. NO contiene datos (--schema-only).
---
--- COMO USARLO en un colegio nuevo:
---   1. Supabase Dashboard -> SQL Editor -> New query
---   2. Pegar este archivo COMPLETO -> Run
---   3. Despues ejecutar sql/01-semilla.sql
---
--- Ajustes hechos a mano sobre la salida de pg_dump (no revertirlos):
---   * Eliminadas las lineas \restrict y \unrestrict: son metacomandos de
---     psql y el SQL Editor de Supabase NO los entiende (da error de
---     sintaxis en la primera linea).
---   * Comentado "CREATE SCHEMA public": ese esquema ya existe en
---     cualquier proyecto Supabase nuevo y el comando falla.
---   * Comentadas las 24 lineas "ALTER DEFAULT PRIVILEGES" y el
---     "COMMENT ON SCHEMA public" (van marcadas con "-- [kit]"). El SQL
---     Editor corre como el rol postgres, que NO puede cambiar los
---     privilegios por defecto de otro rol (supabase_admin) y falla con:
---         ERROR: 42501: permission denied to change default privileges
---     Son innecesarias: todo proyecto Supabase nuevo ya trae esos
---     privilegios por defecto configurados igual.
---
--- REGENERAR cuando cambie el esquema en produccion: ver INSTALACION.md
--- y volver a aplicar los TRES ajustes de arriba.
--- =====================================================================
-
 --
 -- PostgreSQL database dump
 --
 
--- (metacomando \restrict de psql eliminado: el SQL Editor de Supabase no lo entiende)
+\restrict uC8oqL5WeRKwmIBdVUNVw0Syx63N0mJkVE9RQDhJav4kVhizUWkRVYLjzXf4gQd
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.10
@@ -53,14 +23,14 @@ SET row_security = off;
 -- Name: public; Type: SCHEMA; Schema: -; Owner: -
 --
 
--- CREATE SCHEMA public;   -- desactivado: el esquema public ya existe en todo proyecto Supabase nuevo
+CREATE SCHEMA public;
 
 
 --
 -- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
 --
 
--- [kit] COMMENT ON SCHEMA public IS 'standard public schema';
+COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
@@ -357,8 +327,8 @@ ALTER SEQUENCE public.grados_id_seq OWNED BY public.grados.id;
 CREATE TABLE public.grupos (
     id integer NOT NULL,
     grado_id integer NOT NULL,
-    letra text NOT NULL,
-    CONSTRAINT grupos_letra_check CHECK ((letra = ANY (ARRAY['A'::text, 'B'::text, 'C'::text])))
+    nombre text NOT NULL,
+    orden integer NOT NULL
 );
 
 
@@ -546,7 +516,6 @@ ALTER TABLE public.parametros ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE public.periodos (
     id integer NOT NULL,
     nombre text NOT NULL,
-    anio integer DEFAULT EXTRACT(year FROM (now() AT TIME ZONE 'America/Bogota'::text)) NOT NULL,
     activo boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     fecha_inicio timestamp with time zone,
@@ -554,7 +523,8 @@ CREATE TABLE public.periodos (
     asistencia_fecha_inicio timestamp with time zone,
     asistencia_fecha_limite timestamp with time zone,
     calificacion_fecha_inicio timestamp with time zone,
-    calificacion_fecha_limite timestamp with time zone
+    calificacion_fecha_limite timestamp with time zone,
+    anio integer DEFAULT (EXTRACT(year FROM (now() AT TIME ZONE 'America/Bogota'::text)))::integer NOT NULL
 );
 
 
@@ -814,11 +784,11 @@ ALTER TABLE ONLY public.grados
 
 
 --
--- Name: grupos grupos_grado_id_letra_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: grupos grupos_grado_id_nombre_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.grupos
-    ADD CONSTRAINT grupos_grado_id_letra_key UNIQUE (grado_id, letra);
+    ADD CONSTRAINT grupos_grado_id_nombre_key UNIQUE (grado_id, nombre);
 
 
 --
@@ -1713,420 +1683,8 @@ ALTER TABLE public.subparametro_plantilla ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subparametros ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: SCHEMA public; Type: ACL; Schema: -; Owner: -
---
-
-GRANT USAGE ON SCHEMA public TO postgres;
-GRANT USAGE ON SCHEMA public TO anon;
-GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT USAGE ON SCHEMA public TO service_role;
-
-
---
--- Name: FUNCTION current_docente_id(); Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON FUNCTION public.current_docente_id() TO anon;
-GRANT ALL ON FUNCTION public.current_docente_id() TO authenticated;
-GRANT ALL ON FUNCTION public.current_docente_id() TO service_role;
-
-
---
--- Name: FUNCTION is_admin(); Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON FUNCTION public.is_admin() TO anon;
-GRANT ALL ON FUNCTION public.is_admin() TO authenticated;
-GRANT ALL ON FUNCTION public.is_admin() TO service_role;
-
-
---
--- Name: FUNCTION marcar_password_cambiada(); Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON FUNCTION public.marcar_password_cambiada() TO anon;
-GRANT ALL ON FUNCTION public.marcar_password_cambiada() TO authenticated;
-GRANT ALL ON FUNCTION public.marcar_password_cambiada() TO service_role;
-
-
---
--- Name: FUNCTION proteger_nota_minima(); Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON FUNCTION public.proteger_nota_minima() TO anon;
-GRANT ALL ON FUNCTION public.proteger_nota_minima() TO authenticated;
-GRANT ALL ON FUNCTION public.proteger_nota_minima() TO service_role;
-
-
---
--- Name: FUNCTION tiene_modulo(p_modulo text); Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON FUNCTION public.tiene_modulo(p_modulo text) TO anon;
-GRANT ALL ON FUNCTION public.tiene_modulo(p_modulo text) TO authenticated;
-GRANT ALL ON FUNCTION public.tiene_modulo(p_modulo text) TO service_role;
-
-
---
--- Name: FUNCTION tiene_permiso(p_permiso text); Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON FUNCTION public.tiene_permiso(p_permiso text) TO anon;
-GRANT ALL ON FUNCTION public.tiene_permiso(p_permiso text) TO authenticated;
-GRANT ALL ON FUNCTION public.tiene_permiso(p_permiso text) TO service_role;
-
-
---
--- Name: TABLE asignaciones; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.asignaciones TO anon;
-GRANT ALL ON TABLE public.asignaciones TO authenticated;
-GRANT ALL ON TABLE public.asignaciones TO service_role;
-
-
---
--- Name: SEQUENCE asignaciones_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.asignaciones_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.asignaciones_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.asignaciones_id_seq TO service_role;
-
-
---
--- Name: TABLE asistencias; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.asistencias TO anon;
-GRANT ALL ON TABLE public.asistencias TO authenticated;
-GRANT ALL ON TABLE public.asistencias TO service_role;
-
-
---
--- Name: SEQUENCE asistencias_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.asistencias_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.asistencias_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.asistencias_id_seq TO service_role;
-
-
---
--- Name: TABLE configuracion; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.configuracion TO anon;
-GRANT ALL ON TABLE public.configuracion TO authenticated;
-GRANT ALL ON TABLE public.configuracion TO service_role;
-
-
---
--- Name: TABLE docente_modulos; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.docente_modulos TO anon;
-GRANT ALL ON TABLE public.docente_modulos TO authenticated;
-GRANT ALL ON TABLE public.docente_modulos TO service_role;
-
-
---
--- Name: SEQUENCE docente_modulos_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.docente_modulos_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.docente_modulos_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.docente_modulos_id_seq TO service_role;
-
-
---
--- Name: TABLE docentes; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.docentes TO anon;
-GRANT ALL ON TABLE public.docentes TO authenticated;
-GRANT ALL ON TABLE public.docentes TO service_role;
-
-
---
--- Name: TABLE estudiantes; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.estudiantes TO anon;
-GRANT ALL ON TABLE public.estudiantes TO authenticated;
-GRANT ALL ON TABLE public.estudiantes TO service_role;
-
-
---
--- Name: SEQUENCE estudiantes_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.estudiantes_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.estudiantes_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.estudiantes_id_seq TO service_role;
-
-
---
--- Name: TABLE grados; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.grados TO anon;
-GRANT ALL ON TABLE public.grados TO authenticated;
-GRANT ALL ON TABLE public.grados TO service_role;
-
-
---
--- Name: SEQUENCE grados_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.grados_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.grados_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.grados_id_seq TO service_role;
-
-
---
--- Name: TABLE grupos; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.grupos TO anon;
-GRANT ALL ON TABLE public.grupos TO authenticated;
-GRANT ALL ON TABLE public.grupos TO service_role;
-
-
---
--- Name: SEQUENCE grupos_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.grupos_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.grupos_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.grupos_id_seq TO service_role;
-
-
---
--- Name: TABLE incapacidades; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.incapacidades TO anon;
-GRANT ALL ON TABLE public.incapacidades TO authenticated;
-GRANT ALL ON TABLE public.incapacidades TO service_role;
-
-
---
--- Name: SEQUENCE incapacidades_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.incapacidades_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.incapacidades_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.incapacidades_id_seq TO service_role;
-
-
---
--- Name: TABLE marcas; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.marcas TO anon;
-GRANT ALL ON TABLE public.marcas TO authenticated;
-GRANT ALL ON TABLE public.marcas TO service_role;
-
-
---
--- Name: SEQUENCE marcas_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.marcas_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.marcas_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.marcas_id_seq TO service_role;
-
-
---
--- Name: TABLE materias; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.materias TO anon;
-GRANT ALL ON TABLE public.materias TO authenticated;
-GRANT ALL ON TABLE public.materias TO service_role;
-
-
---
--- Name: SEQUENCE materias_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.materias_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.materias_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.materias_id_seq TO service_role;
-
-
---
--- Name: TABLE notas; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.notas TO anon;
-GRANT ALL ON TABLE public.notas TO authenticated;
-GRANT ALL ON TABLE public.notas TO service_role;
-
-
---
--- Name: SEQUENCE notas_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.notas_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.notas_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.notas_id_seq TO service_role;
-
-
---
--- Name: TABLE parametros; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.parametros TO anon;
-GRANT ALL ON TABLE public.parametros TO authenticated;
-GRANT ALL ON TABLE public.parametros TO service_role;
-
-
---
--- Name: SEQUENCE parametros_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.parametros_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.parametros_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.parametros_id_seq TO service_role;
-
-
---
--- Name: TABLE periodos; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.periodos TO anon;
-GRANT ALL ON TABLE public.periodos TO authenticated;
-GRANT ALL ON TABLE public.periodos TO service_role;
-
-
---
--- Name: SEQUENCE periodos_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.periodos_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.periodos_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.periodos_id_seq TO service_role;
-
-
---
--- Name: TABLE permisos_usuario; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.permisos_usuario TO anon;
-GRANT ALL ON TABLE public.permisos_usuario TO authenticated;
-GRANT ALL ON TABLE public.permisos_usuario TO service_role;
-
-
---
--- Name: SEQUENCE permisos_usuario_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.permisos_usuario_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.permisos_usuario_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.permisos_usuario_id_seq TO service_role;
-
-
---
--- Name: TABLE subparametro_plantilla; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.subparametro_plantilla TO anon;
-GRANT ALL ON TABLE public.subparametro_plantilla TO authenticated;
-GRANT ALL ON TABLE public.subparametro_plantilla TO service_role;
-
-
---
--- Name: SEQUENCE subparametro_plantilla_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.subparametro_plantilla_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.subparametro_plantilla_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.subparametro_plantilla_id_seq TO service_role;
-
-
---
--- Name: TABLE subparametros; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public.subparametros TO anon;
-GRANT ALL ON TABLE public.subparametros TO authenticated;
-GRANT ALL ON TABLE public.subparametros TO service_role;
-
-
---
--- Name: SEQUENCE subparametros_id_seq; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON SEQUENCE public.subparametros_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.subparametros_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.subparametros_id_seq TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR SEQUENCES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON FUNCTIONS TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO service_role;
-
-
---
--- Name: DEFAULT PRIVILEGES FOR TABLES; Type: DEFAULT ACL; Schema: public; Owner: -
---
-
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO postgres;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO anon;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO authenticated;
--- [kit] ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON TABLES TO service_role;
-
-
---
 -- PostgreSQL database dump complete
 --
 
--- (metacomando \unrestrict de psql eliminado: el SQL Editor de Supabase no lo entiende)
+\unrestrict uC8oqL5WeRKwmIBdVUNVw0Syx63N0mJkVE9RQDhJav4kVhizUWkRVYLjzXf4gQd
 

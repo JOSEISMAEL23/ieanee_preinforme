@@ -73,6 +73,23 @@ Las migraciones de esquema se hacen con **expand/contract** (tres fases retrocom
 deja la app caída). Una operación irreversible **no se corre la víspera de un uso real con gente
 delante**.
 
+### El MCP de Supabase es de STAGING y de solo lectura
+
+Este repo tiene configurado el servidor `supabase-staging`
+(`--read-only --project-ref=htovyyflchcyocxgkjzv`). **Sirve para mirar la base de pruebas, no para
+cambiarla, y no alcanza producción.**
+
+- **Producción es `lbenvgnrvuckkrrfylhx`** y **no se toca por MCP nunca.** Su SQL se pega a mano en
+  el SQL Editor de Supabase, que es el paso manual que ha evitado incidentes en 14 migraciones.
+- Úsalo para lo que de verdad rinde: **leer la estructura real antes de migrar.** Sobre todo esto,
+  que es la regla nº1 de verificación y no se ve leyendo el `CREATE TABLE` de un dump:
+  ```sql
+  select conname, pg_get_constraintdef(oid)
+  from pg_constraint where conrelid = 'public.LA_TABLA'::regclass;
+  ```
+- ⚠️ **Si alguna vez el MCP consigue escribir algo, la configuración está rota:** avisa y no sigas
+  usándolo hasta arreglarla.
+
 ---
 
 ## Cosas que no se deducen leyendo el código

@@ -6,7 +6,7 @@ import Login from './pages/Login'
 import RoleRedirect from './pages/RoleRedirect'
 import CambiarPassword from './pages/CambiarPassword'
 import AdminDashboard from './pages/admin/AdminDashboard'
-import AjustesInstitucion from './pages/admin/AjustesInstitucion'
+import AdminIndex from './pages/admin/AdminIndex'
 import PeriodosAdmin from './pages/admin/PeriodosAdmin'
 import EstructuraAdmin from './pages/admin/EstructuraAdmin'
 import MateriasAdmin from './pages/admin/MateriasAdmin'
@@ -67,11 +67,13 @@ function App() {
                   corresponde. Materias/Estudiantes/Docentes/Módulos no están
                   en el catálogo de permisos a propósito — crear usuarios y
                   otorgar accesos queda exclusivo del admin. */}
-              <Route index element={
-                <ProtectedRoute permisoRequerido="configurar_institucion">
-                  <AjustesInstitucion />
-                </ProtectedRoute>
-              } />
+              {/* El índice NO puede ser un destino fijo: antes exigía
+                  configurar_institucion y devolvía a /docente a los otros 5
+                  permisos del catálogo, que entraban al layout y salían
+                  expulsados en el mismo instante. AdminIndex manda a cada
+                  quien a la primera sección que sí puede ver, y solo
+                  renderiza Ajustes institución para quien tiene el permiso. */}
+              <Route index element={<AdminIndex />} />
               <Route path="periodos" element={
                 <ProtectedRoute permisoRequerido="gestionar_periodos">
                   <PeriodosAdmin />

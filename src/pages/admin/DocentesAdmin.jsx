@@ -580,7 +580,13 @@ function NuevoDocenteForm({ grados, materiasByGrado, grupos, docentesExistentes,
   }
 
   const guardar = async () => {
-    if (!nombre.trim() || !password.trim() || asignaciones.length === 0) return
+    // Las asignaciones son OPCIONALES a propósito: un coordinador, rector,
+    // secretaria o auxiliar se crea con rol docente + sus permisos, y no
+    // dicta clase (spec permisos-delegados §2-bis). Exigirlas obligaba a
+    // regalarle una materia, y con ella quedaba de titular de ese grupo en
+    // los informes y podía marcar asistencia y dificultades de un curso
+    // ajeno. La función admin-docentes ya acepta la lista vacía.
+    if (!nombre.trim() || !password.trim()) return
     if (!sinCorreo && !email.trim()) return
 
     setGuardando(true)
@@ -689,7 +695,7 @@ function NuevoDocenteForm({ grados, materiasByGrado, grupos, docentesExistentes,
       <div>
         <button
           onClick={guardar}
-          disabled={guardando || !nombre.trim() || !password.trim() || asignaciones.length === 0 || (!sinCorreo && !email.trim())}
+          disabled={guardando || !nombre.trim() || !password.trim() || (!sinCorreo && !email.trim())}
           className="bg-emerald-800 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40"
         >
           {guardando ? 'Creando...' : 'Guardar docente'}

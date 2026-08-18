@@ -68,7 +68,10 @@ export default function AdminDashboard() {
           ))}
         </nav>
         <div className="flex-1 min-w-0">
-          <Outlet />
+          {/* El context lo consume AdminIndex para decidir dónde aterriza
+              cada quien al entrar a /admin, sin recalcular el catálogo ni
+              repetir la consulta de permisos que ya se hizo aquí arriba. */}
+          <Outlet context={{ seccionesVisibles, esAdmin, cargando: !esAdmin && permisos === null }} />
         </div>
       </div>
     </Layout>

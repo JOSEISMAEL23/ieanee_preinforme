@@ -73,6 +73,17 @@ Las migraciones de esquema se hacen con **expand/contract** (tres fases retrocom
 deja la app caída). Una operación irreversible **no se corre la víspera de un uso real con gente
 delante**.
 
+**Todo `CREATE TABLE` en `public` va con sus `GRANT` en el mismo archivo.** Desde el 2026-10-30
+Supabase ya no da `GRANT` automático a las tablas nuevas de `public`: sin ellos la tabla existe,
+pero la app recibe `permission denied` al leerla o escribirla.
+
+```sql
+create table public.mi_tabla ( ... );
+
+grant select on public.mi_tabla to anon;
+grant select, insert, update, delete on public.mi_tabla to authenticated, service_role;
+```
+
 ### El MCP de Supabase es de STAGING y de solo lectura
 
 Este repo tiene configurado el servidor `supabase-staging`

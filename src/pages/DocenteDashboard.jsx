@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { anioActual } from '../lib/periodos'
 import { useNavigate } from 'react-router-dom'
 
 const iconProps = {
@@ -54,6 +55,18 @@ function IconAlertTriangle({ className }) {
       <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
       <path d="M12 9v4" />
       <path d="M12 17h.01" />
+    </svg>
+  )
+}
+
+function IconFileText({ className }) {
+  return (
+    <svg className={className} {...iconProps}>
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+      <path d="M16 13H8" />
+      <path d="M16 17H8" />
+      <path d="M10 9H8" />
     </svg>
   )
 }
@@ -139,6 +152,12 @@ const COLORES = {
     titulo: 'text-slate-800',
     descripcion: 'text-slate-600',
   },
+  amber: {
+    bg: 'bg-amber-50 hover:bg-amber-100 border-amber-200',
+    icono: 'bg-amber-600',
+    titulo: 'text-amber-800',
+    descripcion: 'text-amber-700',
+  },
 }
 
 export default function DocenteDashboard() {
@@ -148,27 +167,33 @@ export default function DocenteDashboard() {
   const [modulosActivos, setModulosActivos] = useState(null) // null = cargando
   const [tieneAsignaciones, setTieneAsignaciones] = useState(null) // null = cargando
   const [permisos, setPermisos] = useState(null) // null = cargando
+  const [tieneAces, setTieneAces] = useState(null) // null = cargando
 
   useEffect(() => {
     if (esAdmin) {
       setModulosActivos(new Set(MODULOS.map(m => m.controlado).filter(Boolean)))
       setTieneAsignaciones(true)
       setPermisos(new Set())
+      setTieneAces(true)
       return
     }
     (async () => {
-      const [modRes, asignRes, permRes] = await Promise.all([
+      const [modRes, asignRes, permRes, acesRes] = await Promise.all([
         supabase.from('docente_modulos').select('modulo, activo').eq('docente_id', docente.id),
         supabase.from('asignaciones').select('id', { count: 'exact', head: true }).eq('docente_id', docente.id),
         supabase.from('permisos_usuario').select('permiso, activo').eq('docente_id', docente.id),
+        // Sin filtro por docente a propósito: la RLS de aces_final ya le
+        // devuelve solo las suyas. Si la consulta falla, no hay botón.
+        supabase.from('aces_final').select('id', { count: 'exact', head: true }).eq('anio', anioActual()),
       ])
       setModulosActivos(new Set((modRes.data || []).filter(m => m.activo).map(m => m.modulo)))
       setTieneAsignaciones((asignRes.count ?? 0) > 0)
       setPermisos(new Set((permRes.data || []).filter(p => p.activo).map(p => p.permiso)))
+      setTieneAces((acesRes.count ?? 0) > 0)
     })()
   }, [docente.id, esAdmin])
 
-  if (modulosActivos === null || tieneAsignaciones === null || permisos === null) {
+  if (modulosActivos === null || tieneAsignaciones === null || permisos === null || tieneAces === null) {
     return (
       <Layout>
         <p className="text-slate-500 text-sm">Cargando...</p>
@@ -180,6 +205,18 @@ export default function DocenteDashboard() {
     (!m.controlado || modulosActivos.has(m.controlado)) &&
     (!m.requiereAsignacion || tieneAsignaciones)
   )
+
+  // ACES final va de primera (es lo urgente cuando aparece) y NO exige
+  // asignación: el docente del ACES puede no tener ese grupo en la app (spec D5).
+  if (tieneAces) {
+    tarjetas.unshift({
+      ruta: '/aces-final',
+      icono: IconFileText,
+      titulo: 'ACES final',
+      descripcion: `Recuperación final ${anioActual()}`,
+      color: 'amber',
+    })
+  }
 
   if (!esAdmin && permisos.size > 0) {
     tarjetas.push({

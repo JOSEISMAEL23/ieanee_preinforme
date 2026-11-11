@@ -24,6 +24,7 @@ import AsistenciaInforme from './pages/AsistenciaInforme'
 import CalificacionesConfig from './pages/CalificacionesConfig'
 import CalificacionesCaptura from './pages/CalificacionesCaptura'
 import CalificacionesInforme from './pages/CalificacionesInforme'
+import AcesFinal from './pages/AcesFinal'
 
 // Catálogo de permisos delegables (spec permisos-delegados §3). Cualquiera
 // de estos habilita la entrada al layout de /admin; cada ruta hija exige
@@ -188,6 +189,17 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CalificacionesInforme />
+                </ProtectedRoute>
+              }
+            />
+            {/* Sin módulo ni permiso a propósito: el docente del ACES puede no
+                tener asignado ese grupo en la app (spec D5). Quién ve qué
+                acta lo decide la RLS de aces_final. */}
+            <Route
+              path="/aces-final"
+              element={
+                <ProtectedRoute>
+                  <AcesFinal />
                 </ProtectedRoute>
               }
             />

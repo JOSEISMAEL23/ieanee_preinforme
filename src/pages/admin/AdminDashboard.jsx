@@ -20,6 +20,8 @@ const secciones = [
   { to: '/admin/parametros', label: 'Config. calificaciones', permiso: 'configurar_calificaciones' },
   { to: '/calificaciones/informe', label: 'Informe calificaciones', permiso: 'ver_informes_notas' },
   { to: '/admin/consolidado', label: 'Consolidado', permiso: 'ver_informes_dificultades' },
+  // El admin no pasa por /docente (exige rol docente): su entrada a ACES es esta.
+  { to: '/aces-final', label: 'ACES final', soloAdmin: true },
   { to: '/asistencia/informe', label: 'Asistencia', soloAdmin: true },
 ]
 

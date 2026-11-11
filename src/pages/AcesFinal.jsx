@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import Layout from '../components/Layout'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { anioActual } from '../lib/periodos'
 import { leerNota, notaATexto, fraseObservacion } from '../lib/escala'
+import { consecutivoATexto, libroAcesFinal, nombreArchivo } from '../lib/acesFinal'
 
 /**
  * ACES FINAL — el docente llena textos y notas de sus actas de recuperación.
@@ -17,6 +19,9 @@ import { leerNota, notaATexto, fraseObservacion } from '../lib/escala'
 
 const COLUMNAS = 'id, consecutivo, docente_id, grupo, area, estudiante, tematicas, desempeno_general, actividades, nota, updated_at'
 
+// Supabase devuelve como máximo 1000 filas por consulta: el Excel se pide por páginas.
+const POR_PAGINA = 1000
+
 // Los tres puntos que se escriben una vez por bloque, numerados como en el acta.
 const TEXTOS = [
   { campo: 'tematicas', titulo: '1. Temáticas trabajadas para alcanzar los desempeños' },
@@ -24,7 +29,6 @@ const TEXTOS = [
   { campo: 'actividades', titulo: '3. Actividades a realizar' },
 ]
 
-const consecutivoATexto = (anio, n) => `${anio} - ${String(n).padStart(3, '0')}`
 const limpiar = t => (t ?? '').trim() || null
 
 // Un bloque = un docente + un grupo + un área. Sus tres textos van iguales en
@@ -89,6 +93,8 @@ export default function AcesFinal() {
   const [borradores, setBorradores] = useState({}) // key de bloque → lo que hay escrito en pantalla
   const [estados, setEstados] = useState({}) // key de bloque → { guardando, error, mensaje }
   const [filtroDocente, setFiltroDocente] = useState(null) // solo admin
+  const [exportando, setExportando] = useState(false)
+  const [estadoExport, setEstadoExport] = useState({}) // { error, mensaje }
 
   useEffect(() => {
     let cancelado = false
@@ -233,6 +239,58 @@ export default function AcesFinal() {
     ponerEstado(bloque.key, { mensaje: `Guardado: ${aGuardar.length} acta${aGuardar.length !== 1 ? 's' : ''}.` })
   }
 
+  // El Excel con el que Claude genera las actas fuera de la app (spec §7).
+  const descargarExcel = async () => {
+    if (haySinGuardar && !window.confirm(
+      'Tienes cambios sin guardar en pantalla y NO van en el Excel: el Excel sale de lo guardado en la base. ¿Descargar de todas formas?'
+    )) return
+
+    setExportando(true)
+    setEstadoExport({})
+    try {
+      // Siempre de la base, no de la pantalla: un docente pudo guardar
+      // después de que se abrió esta página.
+      const { count, error: errorConteo } = await supabase
+        .from('aces_final')
+        .select('id', { count: 'exact', head: true })
+        .eq('anio', anio)
+      if (errorConteo) throw errorConteo
+
+      const todas = []
+      for (let desde = 0; ; desde += POR_PAGINA) {
+        const { data, error } = await supabase
+          .from('aces_final')
+          .select(`${COLUMNAS}, docentes(nombre)`)
+          .eq('anio', anio)
+          .order('consecutivo')
+          .range(desde, desde + POR_PAGINA - 1)
+        if (error) throw error
+        todas.push(...data)
+        if (data.length < POR_PAGINA) break
+      }
+
+      // Un Excel incompleto no avisa solo: se cuenta contra la base.
+      if (todas.length !== count) {
+        throw new Error(`salieron ${todas.length} actas y la base tiene ${count}. No se descargó nada`)
+      }
+
+      const sinNota = todas.filter(f => f.nota === null).length
+      if (sinNota > 0 && !window.confirm(
+        `${sinNota} acta${sinNota !== 1 ? 's' : ''} todavía no tiene${sinNota !== 1 ? 'n' : ''} nota. ¿Descargar de todas formas?`
+      )) return
+
+      XLSX.writeFile(libroAcesFinal(todas, anio), nombreArchivo(anio))
+      setEstadoExport({
+        mensaje: `Descargado: ${todas.length} actas${sinNota > 0 ? `, ${sinNota} sin nota` : ''}. ` +
+          'Lleva nombres de estudiantes: guárdalo en D:, nunca en un repositorio.',
+      })
+    } catch (e) {
+      setEstadoExport({ error: 'No se pudo exportar: ' + (e?.message ?? e) })
+    } finally {
+      setExportando(false)
+    }
+  }
+
   const volver = () => {
     if (haySinGuardar && !window.confirm('Tienes cambios sin guardar. ¿Salir de todas formas?')) return
     navigate(esAdmin ? '/admin' : '/docente')
@@ -247,15 +305,33 @@ export default function AcesFinal() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto flex flex-col gap-5">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={volver}
-            className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
-          >
-            ← Volver
-          </button>
-          <h1 className="text-xl font-bold text-slate-800">ACES final {anio}</h1>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={volver}
+              className="text-sm font-semibold text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition"
+            >
+              ← Volver
+            </button>
+            <h1 className="text-xl font-bold text-slate-800">ACES final {anio}</h1>
+          </div>
+          {esAdmin && bloques.length > 0 && (
+            <button
+              onClick={descargarExcel}
+              disabled={exportando}
+              className="text-sm font-semibold text-emerald-800 border border-emerald-700 px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {exportando ? 'Descargando...' : 'Descargar Excel'}
+            </button>
+          )}
         </div>
+
+        {estadoExport.error && (
+          <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 text-sm text-red-800">{estadoExport.error}</div>
+        )}
+        {estadoExport.mensaje && (
+          <div className="bg-emerald-50 border border-emerald-300 rounded-xl px-4 py-3 text-sm text-emerald-800">{estadoExport.mensaje}</div>
+        )}
 
         {errorCarga && (
           <div className="bg-red-50 border border-red-300 rounded-xl px-4 py-3 text-sm text-red-800">{errorCarga}</div>
